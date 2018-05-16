@@ -11,7 +11,7 @@
 \format{
   A data frame with 0 observations on the following 5 variables.
   \describe{
-    \item{\code{doc_id}}{name of the speech file}
+    \item{\code{doc\_id}}{name of the speech file}
     \item{\code{text}}{contains the text of the speech}
     \item{\code{Date}}{date on which the speech was given}
     \item{\code{institution}}{central bank on which behalf the speech was given}

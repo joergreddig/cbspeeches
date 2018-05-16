@@ -67,3 +67,13 @@ devtools::document()
 devtools::check()
 ```
 
+
+
+
+## Upload to Github
+
+<https://github.com/joergreddig/CBspeeches_rep.git>
+
+Need to do this via the Git bash to connect the folder to a git repository. Then the push/pull functionality in RStudio works. 
+
+
