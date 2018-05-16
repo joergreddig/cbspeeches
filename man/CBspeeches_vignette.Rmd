@@ -1,0 +1,34 @@
+\name{cb_speech_data}
+\alias{cb_speech_data}
+\docType{data}
+\title{
+%%   ~~ data name/kind ... ~~
+}
+\description{
+%%  ~~ A concise (1-5 lines) description of the dataset. ~~
+}
+\usage{data("cb_speech_data")}
+\format{
+  A data frame with 0 observations on the following 5 variables.
+  \describe{
+    \item{\code{doc_id}}{name of the speech file}
+    \item{\code{text}}{contains the text of the speech}
+    \item{\code{Date}}{date on which the speech was given}
+    \item{\code{institution}}{central bank on which behalf the speech was given}
+    \item{\code{Speaker}}{name of the speaker giving the speech}
+  }
+}
+\details{
+%%  ~~ If necessary, more details than the __description__ above ~~
+}
+\source{
+%%  ~~ reference to a publication or URL from which the data were obtained ~~
+}
+\references{
+%%  ~~ possibly secondary sources and usages ~~
+}
+\examples{
+data(cb_speech_data)
+## maybe str(cb_speech_data) ; plot(cb_speech_data) ...
+}
+\keyword{datasets}

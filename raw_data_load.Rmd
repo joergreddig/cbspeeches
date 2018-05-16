@@ -1,0 +1,69 @@
+---
+title: "Raw_data_load"
+author: "Joerg Reddig"
+date: "16 Mai 2018"
+output: html_document
+---
+
+
+## Load raw data
+
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+
+# use readtext package to load the text data into a data frame
+# https://cran.r-project.org/web/packages/readtext/vignettes/readtext_vignette.html
+# https://uc-r.github.io/tidy_text
+
+library(readtext)
+library(tidytext)
+library(tidyverse)
+library(SnowballC)  # for stemming
+
+
+# read the speeches from the text/pdf files
+cb_speech_data <- readtext("data_raw/*",
+                 docvarsfrom = "filenames", 
+                 docvarnames = c("date", "institution", "speaker"),
+                 dvsep = " - ")
+
+```
+
+
+
+## Create data folder
+
+This command will create a data folder and put the file in there with the rda extension.
+
+```{r}
+
+devtools::use_data(cb_speech_data, overwrite = TRUE)
+
+```
+
+
+
+## Create a helf file
+
+Create a file in the folder `R`:
+
+
+```{r}
+devtools::use_package_doc()
+```
+
+
+## Create documents
+
+```{r}
+devtools::document()
+```
+
+
+
+## Test and build
+
+```{r}
+devtools::check()
+```
+
