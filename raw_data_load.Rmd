@@ -6,8 +6,26 @@ output: html_document
 ---
 
 
-## Load raw data
+## Links for instructions
 
+Tutorial: taking your data to go: <http://www.davekleinschmidt.com/r-packages/>
+
+
+
+
+
+## Create data folders
+
+This command will create a data folder for the raw data
+
+```{r}
+# Create folder for raw data and copy it there:
+devtools::use_data_raw()
+
+```
+
+
+Load raw data into data frame
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
 
@@ -18,11 +36,11 @@ output: html_document
 library(readtext)
 library(tidytext)
 library(tidyverse)
-library(SnowballC)  # for stemming
+
 
 
 # read the speeches from the text/pdf files
-cb_speech_data <- readtext("data_raw/*",
+cb_speech_data <- readtext("data-raw/*",
                  docvarsfrom = "filenames", 
                  docvarnames = c("date", "institution", "speaker"),
                  dvsep = " - ")
@@ -30,20 +48,18 @@ cb_speech_data <- readtext("data_raw/*",
 ```
 
 
-
-## Create data folder
-
-This command will create a data folder and put the file in there with the rda extension.
+Use the `use_data` function to save the data frame into the data folder of the package as an `rda` file:
 
 ```{r}
-
 devtools::use_data(cb_speech_data, overwrite = TRUE)
 
 ```
 
 
 
-## Create a helf file
+----------------------------------
+
+## Create a help file
 
 Create a file in the folder `R`:
 

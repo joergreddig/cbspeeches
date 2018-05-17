@@ -2,14 +2,14 @@
 \alias{cb_speech_data}
 \docType{data}
 \title{
-%%   ~~ data name/kind ... ~~
+Speeches of Central Bank Govenors
 }
 \description{
-%%  ~~ A concise (1-5 lines) description of the dataset. ~~
+The package contains text data on the speeches of govenors of the major central banks. 
 }
 \usage{data("cb_speech_data")}
 \format{
-  A data frame with 0 observations on the following 5 variables.
+  A data frame with many observations on the following 5 variables.
   \describe{
     \item{\code{doc\_id}}{name of the speech file}
     \item{\code{text}}{contains the text of the speech}
@@ -29,6 +29,6 @@
 }
 \examples{
 data(cb_speech_data)
-## maybe str(cb_speech_data) ; plot(cb_speech_data) ...
+str(cb_speech_data) 
 }
-\keyword{datasets}
+\keyword{datasets, central banks, text analysis}
