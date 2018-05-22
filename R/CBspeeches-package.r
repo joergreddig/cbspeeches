@@ -1,5 +1,5 @@
-#' CBspeeches.
+#' cbspeeches.
 #'
-#' @name CBspeeches
+#' @name cbspeeches
 #' @docType package
 NULL

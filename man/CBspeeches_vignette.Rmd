@@ -1,5 +1,5 @@
-\name{cb_speech_data}
-\alias{cb_speech_data}
+\name{cbspeeches}
+\alias{cbspeeches}
 \docType{data}
 \title{
 Speeches of Central Bank Govenors
@@ -7,7 +7,7 @@ Speeches of Central Bank Govenors
 \description{
 The package contains text data on the speeches of govenors of the major central banks. 
 }
-\usage{data("cb_speech_data")}
+\usage{data("cbspeeches")}
 \format{
   A data frame with many observations on the following 5 variables.
   \describe{
@@ -28,7 +28,7 @@ The package contains text data on the speeches of govenors of the major central 
 %%  ~~ possibly secondary sources and usages ~~
 }
 \examples{
-data(cb_speech_data)
-str(cb_speech_data) 
+data(cbspeeches)
+str(cbspeeches) 
 }
 \keyword{datasets, central banks, text analysis}

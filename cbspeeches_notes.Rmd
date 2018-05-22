@@ -10,6 +10,8 @@ output: html_document
 
 Tutorial: taking your data to go: <http://www.davekleinschmidt.com/r-packages/>
 
+<http://rmhogervorst.nl/cleancode/blog/2016/03/07/create-package-for-dataset.html>
+<http://kbroman.org/pkg_primer/pages/data.html>
 
 
 
@@ -40,7 +42,7 @@ library(tidyverse)
 
 
 # read the speeches from the text/pdf files
-cb_speech_data <- readtext("data-raw/*",
+cbspeeches <- readtext("data-raw/*",
                  docvarsfrom = "filenames", 
                  docvarnames = c("date", "institution", "speaker"),
                  dvsep = " - ")
@@ -51,8 +53,15 @@ cb_speech_data <- readtext("data-raw/*",
 Use the `use_data` function to save the data frame into the data folder of the package as an `rda` file:
 
 ```{r}
-devtools::use_data(cb_speech_data, overwrite = TRUE)
+devtools::use_data(cbspeeches, overwrite = TRUE)
 
+```
+
+
+For better access from other analytical tools, make the data also available in csv file format: 
+
+```{r}
+write.csv(cb_speech_data, file = "data/cbspeech.csv")
 ```
 
 
@@ -88,7 +97,7 @@ devtools::check()
 
 ## Upload to Github
 
-<https://github.com/joergreddig/CBspeeches_rep.git>
+<https://github.com/joergreddig/cbspeeches.git>
 
 Need to do this via the Git bash to connect the folder to a git repository. Then the push/pull functionality in RStudio works. 
 
