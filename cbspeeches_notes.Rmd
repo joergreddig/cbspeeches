@@ -1,5 +1,5 @@
 ---
-title: "Raw_data_load"
+title: "Notes for cbspeeches Package"
 author: "Joerg Reddig"
 date: "16 Mai 2018"
 output: html_document
@@ -20,7 +20,7 @@ Tutorial: taking your data to go: <http://www.davekleinschmidt.com/r-packages/>
 
 This command will create a data folder for the raw data
 
-```{r}
+```{r, eval=FALSE}
 # Create folder for raw data and copy it there:
 devtools::use_data_raw()
 
@@ -61,7 +61,7 @@ devtools::use_data(cbspeeches, overwrite = TRUE)
 For better access from other analytical tools, make the data also available in csv file format: 
 
 ```{r}
-write.csv(cb_speech_data, file = "data/cbspeech.csv")
+write.csv(cbspeeches, file = "data/cbspeeches.csv", row.names = FALSE)
 ```
 
 
@@ -73,14 +73,14 @@ write.csv(cb_speech_data, file = "data/cbspeech.csv")
 Create a file in the folder `R`:
 
 
-```{r}
+```{r, eval=FALSE}
 devtools::use_package_doc()
 ```
 
 
 ## Create documents
 
-```{r}
+```{r, eval=FALSE}
 devtools::document()
 ```
 
@@ -88,7 +88,7 @@ devtools::document()
 
 ## Test and build
 
-```{r}
+```{r, eval=FALSE}
 devtools::check()
 ```
 
@@ -101,4 +101,17 @@ devtools::check()
 
 Need to do this via the Git bash to connect the folder to a git repository. Then the push/pull functionality in RStudio works. 
 
+
+
+----------------------------------
+
+## Using the cbspeeches package
+
+
+```{r, eval=FALSE}
+
+devtools::install_github("joergreddig/cbspeeches")
+data("cbspeeches")
+
+```
 
