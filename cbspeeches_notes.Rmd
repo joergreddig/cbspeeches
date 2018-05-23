@@ -47,6 +47,12 @@ cbspeeches <- readtext("data-raw/*",
                  docvarnames = c("date", "institution", "speaker"),
                  dvsep = " - ")
 
+
+# cleaning up the date values, which might contain a letter for the speech
+
+library(stringr)
+cbspeeches$date <- str_replace(cbspeeches$date, "[ab]", "")
+
 ```
 
 
@@ -112,6 +118,22 @@ Need to do this via the Git bash to connect the folder to a git repository. Then
 
 devtools::install_github("joergreddig/cbspeeches")
 data("cbspeeches")
+
+```
+
+
+
+In python, one can read the csv file: 
+
+```{python, eval=FALSE}
+
+import pandas as pd
+
+url = "https://raw.githubusercontent.com/joergreddig/cbspeeches/master/data/cbspeeches.csv"
+
+df = pd.read_csv(url, encoding = "latin1")
+
+print(df.head(5))
 
 ```
 
