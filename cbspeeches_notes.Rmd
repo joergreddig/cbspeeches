@@ -49,9 +49,13 @@ cbspeeches <- readtext("data-raw/*",
 
 
 # cleaning up the date values, which might contain a letter for the speech
-
 library(stringr)
 cbspeeches$date <- str_replace(cbspeeches$date, "[ab]", "")
+
+
+# change date column from string into  date format:
+cbspeeches <- cbspeeches %>%
+    mutate(date = as.Date(date, format = "%Y-%m-%d"))
 
 ```
 
