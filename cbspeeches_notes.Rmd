@@ -47,6 +47,9 @@ cbspeeches <- readtext("data-raw/*",
                  docvarnames = c("date", "institution", "speaker"),
                  dvsep = " - ")
 
+# delete all special characters in the text
+cbspeeches$text <- gsub('\n','', cbspeeches$text)
+cbspeeches$text <- gsub('\"','', cbspeeches$text)
 
 # cleaning up the date values, which might contain a letter for the speech
 library(stringr)
