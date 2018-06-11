@@ -38,7 +38,7 @@ Load raw data into data frame
 library(readtext)
 library(tidytext)
 library(tidyverse)
-
+library(readxl)
 
 
 # read the speeches from the text/pdf files
@@ -61,6 +61,24 @@ cbspeeches <- cbspeeches %>%
     mutate(date = as.Date(date, format = "%Y-%m-%d"))
 
 ```
+
+
+Enrich speeches data with metadata from excel file:
+
+```{r}
+
+speeches_overview <- read_excel("data/Raw Data - All Speeches.xlsx", sheet = "Sheet1")
+ 
+speeches_overview <- speeches_overview %>%
+    select(c(doc_id, Date, Speaker, City, Country, Event, Title)) 
+
+cbspeeches <- inner_join(cbspeeches, speeches_overview)
+
+rm(speeches_overview)
+```
+
+
+
 
 
 Use the `use_data` function to save the data frame into the data folder of the package as an `rda` file:
