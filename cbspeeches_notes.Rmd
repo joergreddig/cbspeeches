@@ -70,11 +70,18 @@ Enrich speeches data with metadata from excel file:
 speeches_overview <- read_excel("data/Raw Data - All Speeches.xlsx", sheet = "Sheet1")
  
 speeches_overview <- speeches_overview %>%
-    select(c(doc_id, Date, Speaker, City, Country, Event, Title)) 
+    select(c(Filename, City, Country, Event, Title)) %>% 
+    rename(doc_id = Filename, city = City, country = Country, event = Event, title = Title)
 
 cbspeeches <- inner_join(cbspeeches, speeches_overview)
 
 rm(speeches_overview)
+
+# test_set <- cbspeechesX %>% 
+#   group_by(doc_id) %>% 
+#   filter(n()>1)
+
+
 ```
 
 
