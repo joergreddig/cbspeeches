@@ -1,0 +1,42 @@
+---
+title: "Web scraping"
+author: "Joerg Reddig"
+date: "15 August 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Web scraping for cbspeeches
+
+
+
+### Selector Gadget
+
+Selector gadget (from <www.selectorgadget.com>) helps to easily identify the selector for specific xml feeds from websites. 
+
+
+
+### rvest package
+
+* tutorial video <https://www.youtube.com/watch?v=82s8KdZt5v8>, <https://www.youtube.com/watch?v=f_FmrzOzfNg>
+
+
+https://stat4701.github.io/edav/2015/04/02/rvest_tutorial/
+
+https://stackoverflow.com/questions/39246739/downloading-multiple-files-using-download-file-function-in-r
+
+```{r}
+library(rvest)
+
+
+url_base <- "https://www.bankofengland.co.uk/speech/speeches"
+
+
+
+```
+
