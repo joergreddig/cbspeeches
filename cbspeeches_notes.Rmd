@@ -67,7 +67,7 @@ Enrich speeches data with metadata from excel file:
 
 ```{r}
 
-speeches_overview <- read_excel("data/Raw Data - All Speeches.xlsx", sheet = "Sheet1")
+speeches_overview <- read_excel("data/Raw Data - All Speeches 2011-2018.xlsx", sheet = "All speeches 2014-2018")
  
 speeches_overview <- speeches_overview %>%
     select(c(Filename, City, Country, Event, Title, Language)) %>% 
