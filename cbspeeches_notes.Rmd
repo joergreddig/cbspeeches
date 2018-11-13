@@ -6,6 +6,19 @@ output: html_document
 ---
 
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+##--------Load Libraries------------##
+library(readtext)
+library(tidytext)
+library(tidyverse)
+library(readxl)
+
+```
+
+
 ## Links for instructions
 
 Tutorial: taking your data to go: <http://www.davekleinschmidt.com/r-packages/>
@@ -27,7 +40,7 @@ devtools::use_data_raw()
 ```
 
 
-Load raw data into data frame
+## Load raw data into data frame
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
 
@@ -35,10 +48,6 @@ Load raw data into data frame
 # https://cran.r-project.org/web/packages/readtext/vignettes/readtext_vignette.html
 # https://uc-r.github.io/tidy_text
 
-library(readtext)
-library(tidytext)
-library(tidyverse)
-library(readxl)
 
 
 # read the speeches from the text/pdf files
@@ -63,7 +72,7 @@ cbspeeches <- cbspeeches %>%
 ```
 
 
-Enrich speeches data with metadata from excel file:
+## Enrich speeches data with metadata from excel file:
 
 ```{r}
 
