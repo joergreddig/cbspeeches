@@ -96,7 +96,7 @@ scrape_ecb_2007 <- function (i) {
         date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
         title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
         subtitle = html_text(html_nodes(page, ".ecb-pressContentPubDate")),
-        text     = paste(html_text(html_nodes(page, "article p")), collapse = ""), ###instead of only article p
+        text     = paste(html_text(html_nodes(page, "article p")), collapse = ""), 
         footnote = paste(html_text(html_nodes(page, ".footnote p")), collapse = "")
     )    
 
@@ -109,6 +109,8 @@ scrape_ecb_2007 <- function (i) {
 ecb_links <- map_df(2009, get_speech_list_ecb)
 
 #### need to get rid of non-english speeches!
+    # only delete if there is an english version available
+    # extract speech language in new column
 
 ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2007) 
 
@@ -132,7 +134,10 @@ ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2007)
 
 ```{r save2file}
 
-write(ecb_speeches$text[4], file = paste0(ecb_speeches$date[4], " - ECB - Name", ".txt"))
+
+speeches_to_file <- function(i) {
+    write(ecb_speeches$text[i], file = paste0(ecb_speeches$date[i], " - ECB - Name", ".txt"))
+}
 
 # need to write with walk function as saving file is a side effect
 
