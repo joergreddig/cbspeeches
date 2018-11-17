@@ -1,0 +1,833 @@
+---
+title: "Text Mining Speeches"
+author: "Joerg Redding; Sebastian Ahlfeld"
+date: "June 18, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+##Preparing the analysis
+
+```{r Initiate Programme}
+
+##Load packages
+  ##library(cbspeeches)
+  ##library(devtools)
+  library(dplyr)
+  library(ggplot2)
+  library(koRpus)
+  library(lubridate)
+  library(lubridate)
+  library(qdapDictionaries)
+  library(qdapRegex)
+  library(qdapTools)
+  library(readtext)
+  library(readxl)
+  library(reshape2)
+  library(stringi)
+  library(stringr)
+  library(tidyr)
+  library(tidytext)
+  library(tidyverse)
+  library(tm)
+
+##Set global options
+  options (stringsAsFactors=F)
+
+```
+
+```{r Option 1: Create the data set from scratch}
+
+##Create a table containing the actual text of the speeches 
+
+  #read the speeches from the text/pdf files
+  cbspeeches <- readtext("J:/Secretariat/08 Other/Research/04 Speeches All/*",
+                 docvarsfrom = "filenames", 
+                 docvarnames = c("date", "institution", "speaker"),
+                 dvsep = " - ")
+
+  # delete all special characters in the text
+  cbspeeches$text <- gsub('\n','', cbspeeches$text)
+  cbspeeches$text <- gsub('\"','', cbspeeches$text)
+
+  # cleaning up the date values, which might contain a letter for the speech
+  cbspeeches$date <- str_replace(cbspeeches$date, "[ab]", "")
+
+  # change date column from string into  date format:
+  cbspeeches <- cbspeeches %>%
+    mutate(date = as.Date(date, format = "%Y-%m-%d"))
+
+
+##Create table that contains all the rest of the information
+
+  #Read Excel-File
+  speeches_overview <- read_excel("J:/Secretariat/08 Other/Research/01 Data/Raw Data - All Speeches 2009-2018.xlsx")
+
+  speeches_overview <- speeches_overview %>%
+    select(c(Filename, City, Country, Event, Title, Length, Flesch, Language)) %>% 
+    rename(doc_id = Filename, city = City, country = Country, 
+           event = Event, length = Length, flesch = Flesch, language = Language)
+  
+  
+  #Match the two tables to create the full data set
+  cbspeeches <- inner_join(cbspeeches, speeches_overview)
+
+```
+
+```{r Option 2: Just load the dataset from github or from a local folder}
+
+##Option 1 - Private PC: Load directly from github (does not work from ECB Computers)
+  #download.file("https://raw.github.com/joergreddig/cbspeeches/master/data/cbspeeches.rda", 
+    #destfile = "D:/Eigene Dateien/Research/01 R-Files/cbspeeches.rda") 
+  #load(file = "D:/Eigene Dateien/Research/01 R-Files/cbspeeches.rda")
+  
+  
+##Option 2 - Office PC: Create dataframe containing all speeches
+  load(file = "J:/Secretariat/08 Other/Research/07 R-Files/data/cbspeeches.rda")
+
+  
+##Option 3 - Load data via the cbspeeches library
+  #data(cbspeeches)
+  
+```
+
+
+##Dealing with the number of speeches
+
+```{r Compare NUMBER of speeches given by INSTITUTIONS over ENTIRE PERIOD}
+
+##Create the data set
+  speeches_total_inst_df <- cbspeeches %>%
+   mutate(year = year(date)) %>%
+   group_by(institution) %>%
+   summarise(count = n()) %>%
+   ungroup()
+  
+##Create the bar-chart (add average via the geom_hline-command)
+  ggplot(speeches_total_inst_df, aes(y = count, x = reorder(institution, count), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    labs(y="Number of speeches 2009-2018", x="Institution", title="Number of speeches, 2009-2018") +
+    geom_hline(yintercept = mean(speeches_total_inst_df$count)) +
+    theme_grey() +
+    coord_flip()
+```
+  
+```{r Compare NUMBER of speeches given by INSTITUTIONS in SINGLE YEARS}
+  
+##Create the data set
+  speeches_years_inst_df <- cbspeeches %>%
+   mutate(year = year(date)) %>%
+   group_by(year, institution) %>%
+    summarise(count = n()) %>%
+    ungroup() %>%
+    arrange(year, count) %>%
+    mutate(order = row_number())
+  
+##Create the bar-chart (add average via the geom_hline-command)
+  ggplot(speeches_years_inst_df, aes(y = count, x = order, width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    theme_grey() +
+    facet_wrap(~year, scales="free_y", nrow=3) +
+    scale_x_continuous(breaks = speeches_years_inst_df$order, labels = speeches_years_inst_df$institution, expand = c(0,0)) +
+    labs(y="Speeches per year 2009-2018", x="Institution", title="Number of speeches 2009-2018") +
+    geom_hline(yintercept = mean(speeches_years_inst_df$count)) +
+    coord_flip()
+```
+
+```{r Plot NUMBER of speeches given by INSTITUTIONS each SINGLE YEAR} 
+
+##Define a function that would filter the master-table (cbspeeches) for the different institutions 
+    FUN_inst <- function(inst)(cbspeeches %>%
+      filter(institution == inst))
+
+##Define a vector that contains all institutions
+    inst <- c("ECB","SSM", "BuBa", "Fed")
+
+##Create data set
+    
+    #Initiate a loop that goes from 1 to the length of the vector above
+     for (i in 1:length(inst)){  
+
+    #The variable inst[x] refers to the relevant element of the vector. Fed into the function it filters the master-table      
+    #accordingly
+     speeches_institution_years_df <- FUN_inst(inst[i])
+      
+     speeches_institution_years_df <- speeches_institution_years_df %>%
+      mutate(year = year(date)) %>%
+      group_by(year) %>%
+      summarise(count = n()) %>%
+      ungroup()
+     
+     speeches_institution_years_df$year = as.Date(as.character(speeches_institution_years_df$year), "%Y")
+  
+##Create and print the chart (add average via the geom_hline-command)   
+     chart_speeches_per_year_institution <- ggplot(speeches_institution_years_df, aes(x = year, y = count)) +
+      geom_line(colour = "steelblue", size = 1.2) +
+      labs(x = "Year", y = "Number of speeches", title = "Speeches per year, 2009-2018", subtitle = inst[i]) +
+      geom_hline(yintercept = mean(speeches_institution_years_df$count)) +
+      scale_y_continuous(limits = c(0, 150))
+      
+     print(chart_speeches_per_year_institution)
+}
+    
+```
+
+```{r Plot NUMBER of speeches given by INSTITUTIONS each SINGLE MONTH}
+  
+##Define a function that would filter the master-table (cbspeeches) for the different institutions 
+  FUN_inst <- function(inst)(cbspeeches %>%
+    filter(institution == inst))
+
+##Define a vector that contains all institutions
+    inst <- c("BuBa","ECB", "Fed", "SSM")
+
+##Create data set
+    
+  #Initiate a loop that goes from 1 to the length of the vector above
+   for (i in 1:length(inst)){
+  
+  #The variable inst[x] refers to the relevant element of the vector. Fed into the function it filters the master-table      
+  #accordingly
+   speeches_institution_month_df <- FUN_inst(inst[i])
+  
+  #Create the table 
+    speeches_institution_month_df <- speeches_institution_month_df %>%
+     mutate(month = month(date)) %>%
+     mutate(year = year(date)) %>%
+     group_by(year, month) %>%
+     summarise(count = n()) %>%
+     ungroup()
+  
+  #Create column that combines year and month and adds 1 for the day. Then assign the date-format to the new column
+    speeches_institution_month_df$date <- paste0(speeches_institution_month_df$month, "-", +
+    speeches_institution_month_df$year, "-", "1" )
+  
+    speeches_institution_month_df$date <- myd(speeches_institution_month_df$date)
+  
+  #Define a variable that contains the starting point for the chart (to be always 1 January 2014)  
+    from <- seq(as.Date("2009-01-01"), as.Date("2009-01-01"), by="days")
+  
+  #Complete the table by adding rows for the months in which there was no speech (these months do not appear in the original 
+  #table)  
+    speeches_institution_month_df <- speeches_institution_month_df %>%
+      mutate(date = as.Date(date)) %>%
+      complete(date = seq.Date(from, max(date), by="months")) 
+  
+  #The added rows contain NA as there is no number of speeches. Replace NA with 0  
+    speeches_institution_month_df$count[is.na(speeches_institution_month_df$count)] <- 0
+  
+##Create and print the chart (add average via the geom_hline-command)  
+    chart_speeches_per_month_institution <- ggplot(speeches_institution_month_df, aes(x = date, y = count, group = 1)) + 
+      geom_line(colour = "steelblue", size = 1.2) +
+      geom_hline(yintercept = mean(speeches_institution_month_df$count)) +
+      labs(x = "Month", y = "Number of speeches", title = "Speeches per month, 2009-2018", subtitle = inst[i]) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      scale_x_date(date_breaks = "2 months") + scale_y_continuous(breaks=c(1:20)) +
+      stat_smooth()
+    
+    print(chart_speeches_per_month_institution)
+}
+```
+
+```{r Compare NUMBER of speeches given by SPEAKERS over ENTIRE PERIOD}
+
+##Create the data set
+  speeches_total_speaker_df <- cbspeeches %>%
+   mutate(year = year(date)) %>%
+   group_by(speaker) %>%
+   summarise(count = n()) %>%
+   ungroup()
+  
+##Create the bar-chart (add average via the geom_hline-command)
+  ggplot(speeches_total_speaker_df, aes(y = count, x = reorder(speaker, count), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    labs(y="Number of speeches 2009-2018", x="Speaker", title="Number of speeches 2009-2018") +
+    geom_hline(yintercept = mean(speeches_total_speaker_df$count)) +
+    theme_grey() +
+    coord_flip()
+   
+  
+```
+  
+```{r Compare NUMBER of speeches given by SPEAKERS in SINGLE YEARS}  
+
+##Create the data set
+  speeches_years_speaker_df <- cbspeeches %>%
+   mutate(year = year(date)) %>%
+   group_by(year, speaker) %>%
+   summarise(count = n()) %>%
+   ungroup() %>% arrange(year, count) %>% 
+   mutate(order = row_number())
+  
+##Create the bar-chart (add average via the geom_hline-command)
+  ggplot(speeches_years_speaker_df, aes(y = count, x = order, width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    theme_grey() +
+    geom_hline(yintercept = mean(speeches_years_speaker_df$count)) +
+    facet_wrap(~year, scales = "free_y", nrow=3) +
+    scale_x_continuous(breaks = speeches_years_speaker_df$order, labels = speeches_years_speaker_df$speaker, expand = c(0,0)) +
+    labs(y="Speeches per year 2009-2018", x="Speaker", title="Number of speeches 2009-2018") +
+    coord_flip()
+```
+
+```{r Plot NUMBER of speeches given by SPEAKERS each SINGLE YEAR} 
+  
+##Define a function that would filter the master-table (cbspeeches) for the different speakers 
+    FUN_spk <- function(spk)(cbspeeches %>%
+      filter(speaker == spk))
+
+##Define a vector that contains all speakers
+    spk <- c("Andreas Dombret", "Ben Bernanke", "Benoit Coeure", "Carl-Ludwig Thiele", "Claudia Buch", "Daniele Nouy",
+             "Daniel Tarullo", "Elizabeth Duke", "Ignazio Angeloni", "Janet Yellen", "Jens Weidmann", "Jeremy Stein",
+             "Jerome Powell", "Joachim Nagel", "Joachim Wuermeling", "Joerg Asmussen", "Johannes Beermann", "Julie Dickson",
+             "Lael Brainard", "Mario Draghi", "Pentti Hakkarainen", "Peter Praet", "Randal Quarles", "Rudolf Boehmler",
+             "Sabine Lautenschlaeger", "Sarah Bloom Raskin", "Stanley Fischer", "Vitor Constancio", "Yves Mersch")
+
+##Create data set
+    
+    #Initiate a loop that goes from 1 to the length of the vector above
+     for (i in 1:length(spk)){  
+
+    #The variable inst[x] refers to the relevant element of the vector. Fed into the function it filters the master-table      
+    #accordingly
+     speeches_speaker_years_df <- FUN_spk(spk[i])
+      
+     speeches_speaker_years_df <- speeches_speaker_years_df %>%
+      mutate(year = year(date)) %>%
+      group_by(year) %>%
+      summarise(count = n()) %>%
+      ungroup()
+     
+     speeches_speaker_years_df$year = as.Date(as.character(speeches_speaker_years_df$year), "%Y")
+  
+##Create and print the chart (add average via the geom_hline-command)        
+     chart_speeches_per_year_speaker <- ggplot(speeches_speaker_years_df, aes(x = year, y = count)) +
+      geom_line(colour = "steelblue", size = 1.2) +
+      geom_hline(yintercept = mean(speeches_speaker_years_df$count)) +
+      labs(x = "Year", y = "Number of speeches", title = "Speeches per year, 2009-2018", subtitle = spk[i]) +
+      scale_y_continuous(limits = c(0, 60))
+     
+     print(chart_speeches_per_year_speaker)
+}
+    
+```
+
+```{r Plot NUMBER of speeches given by SPEAKERS each SINGLE MONTH} 
+  
+##Define a function that would filter the master-table (cbspeeches) for the different speakers 
+    FUN_spk <- function(spk)(cbspeeches %>%
+      filter(speaker == spk))
+
+##Define a vector that contains all institutions
+    spk <- c("Andreas Dombret","Benoit Coeure", "Carl-Ludwig Thiele", "Claudia Buch", "Daniele Nouy", "Daniel Tarullo", 
+               "Ignazio Angeloni", "Janet Yellen", "Jens Weidmann", "Jeremy Stein", "Jerome Powell", "Joachim Nagel", 
+               "Joachim Wuermeling", "Johannes Beermann", "Julie Dickson", "Lael Brainard", "Mario Draghi", 
+               "Pentti Hakkarainen", "Peter Praet", "Randal Quarles", "Sabine Lautenschlaeger", "Stanley Fischer", 
+               "Vitor Constancio", "Yves Mersch")
+
+##Create data set
+    
+    #Initiate a loop that goes from 1 to the length of the vector above    
+     for (i in 1:length(spk)){  
+
+    #The variable spk[x] refers to the relevant element of the vector. Fed into the function it filters the master-table      
+    #accordingly
+     speeches_speaker_month_df <- FUN_spk(spk[i])
+      
+    #Create the table 
+     speeches_speaker_month_df <- speeches_speaker_month_df %>%
+      mutate(month = month(date)) %>%
+      mutate(year = year(date)) %>%
+      group_by(year, month) %>%
+      summarise(count = n()) %>%
+      ungroup()
+  
+   #Create column that combines year and month and adds 1 for the day. Then assign the date-format to the new column
+    speeches_speaker_month_df$date <- paste0(speeches_speaker_month_df$month, "-", speeches_speaker_month_df$year, "-", "1" )
+    speeches_speaker_month_df$date <- myd(speeches_speaker_month_df$date)
+  
+   #Define a variable that contains the starting point for the chart (to be always 1 January 2014)  
+    from <- seq(as.Date("2009-01-01"), as.Date("2009-01-01"), by="days")
+  
+   #Complete the table by adding rows for the months in which there was no speech (these months do not appear in the original 
+   #table)  
+    speeches_speaker_month_df <- speeches_speaker_month_df %>%
+      mutate(date = as.Date(date)) %>%
+      complete(date = seq.Date(from, max(date), by="months")) 
+  
+   #The added rows contain NA as there is no number of speeches. Replace NA with 0  
+    speeches_speaker_month_df$count[is.na(speeches_speaker_month_df$count)] <- 0
+  
+##Create and print the chart (add average via the geom_hline-command)      
+    chart_speeches_per_month_speaker <- ggplot(speeches_speaker_month_df, aes(x = date, y = count, group = 1)) +
+      geom_line(colour = "steelblue", size = 1.2) +
+      geom_hline(yintercept = mean(speeches_speaker_month_df$count)) +
+      labs(x = "Month", y = "Number of speeches", title = "Speeches per month, 2009-2018", subtitle = spk[i]) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      scale_x_date(date_breaks = "2 months") + scale_y_continuous(breaks=c(1:10)) +
+      stat_smooth()
+    
+    print(chart_speeches_per_month_speaker)
+}
+    
+```
+
+
+##Dealing with the length of speeches
+
+```{r Compare TOTAL AND AVERAGE LENGTH of speeches per INSTITUTION for ENTIRE PERIOD}
+
+##Create a table that contains both institution and average/total length
+  average_length_institutions_total_df <- cbspeeches %>%
+   group_by(institution) %>%
+   summarise(number = n(), total = sum(lengths(gregexpr("\\W+", text))), average = total/number) %>%
+   ungroup() %>%
+   arrange(average)
+  
+  total_length_institutions_total_df <- cbspeeches %>%
+   group_by(institution) %>%
+   summarise(number = n(), total = (sum(lengths(gregexpr("\\W+", text)))/1000)) %>%
+   ungroup() %>%
+   arrange(total)
+  
+  #Set number of digits in the table to 0
+  average_length_institutions_total_df$average <- round(average_length_institutions_total_df$average, 0)
+  total_length_institutions_total_df$total <- round(total_length_institutions_total_df$total, 0)
+  
+##Create charts
+  ggplot(average_length_institutions_total_df, aes(y = average, x = reorder(institution, average), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    labs(y="Average length of speeches 2009-2018", x="Institution", title="Average length of speeches, 2009-2018") +
+    geom_hline(yintercept = mean(average_length_institutions_total_df$average)) +
+    theme_grey() +
+    coord_flip()
+  
+  ggplot(total_length_institutions_total_df, aes(y = total, x = reorder(institution, total), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    labs(y="Total length of speeches 2009-2018", x="Institution", title="Total length of speeches, 2009-2018",
+      subtitle="in '000") +
+    geom_hline(yintercept = mean(total_length_institutions_total_df$total)) +
+    theme_grey() +
+    coord_flip()
+```
+
+```{r Compare TOTAL AND AVERAGE LENGTH of speeches per INSTITUTION for SINGLE YEARS}
+
+##Create and sort data sets for average and total length of speeches per year
+  average_length_institutions_year_df <- cbspeeches %>%
+   mutate(year = year(date)) %>%
+   group_by(year, institution) %>%
+   summarise(number = n(), total = sum(lengths(gregexpr("\\W+", text))), average = total/number) %>%
+   ungroup() %>%
+   arrange(year, average) %>%
+   mutate(order = row_number())
+  
+  total_length_institutions_year_df <- cbspeeches %>%
+   mutate(year = year(date)) %>%
+   group_by(year, institution) %>%
+   summarise(number = n(), total = (sum(lengths(gregexpr("\\W+", text)))/1000)) %>%
+   ungroup() %>%
+   arrange(year, total) %>%
+   mutate(order = row_number())
+  
+  #Set number of digits in the table to 0
+   average_length_institutions_year_df$average <- round(average_length_institutions_year_df$average, 0)
+   total_length_institutions_year_df$total <- round(total_length_institutions_year_df$total, 0)
+  
+##Create charts 
+  ggplot(average_length_institutions_year_df, aes(y = average, x = order, width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    theme_grey() +
+    labs(y="Average length of speeches 2009-2018", x="Institution", title="Average length of speeches, 2009-2018") +
+    geom_hline(yintercept = mean(average_length_institutions_year_df$average)) +
+    facet_wrap(~year, scales="free", nrow=3) +
+    scale_x_continuous(breaks = average_length_institutions_year_df$order, 
+    labels = average_length_institutions_year_df$institution, expand = c(0,0)) +
+    coord_flip()
+ 
+  ggplot(total_length_institutions_year_df, aes(y = total, x = order, width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    theme_grey() +
+    labs(y="Total length of speeches 2009-2018", x="Institution", title="Total length of speeches, 2009-2018", 
+    subtitle="in '000") +
+    geom_hline(yintercept = mean(total_length_institutions_year_df$total)) +
+    facet_wrap(~year, scales="free", nrow=3) +
+    scale_x_continuous(breaks = total_length_institutions_year_df$order, 
+    labels = total_length_institutions_year_df$institution, expand = c(0,0)) +
+    coord_flip()
+```
+
+```{r Plot LENGTH of speeches per INSTITUTION}
+
+##Define a function that would filter the master-table (cbspeeches) for the different institutions 
+    FUN_inst <- function(inst)(cbspeeches %>%
+      filter(institution == inst))
+
+##Define a vector that contains all institutions
+    inst <- c("ECB","SSM", "BuBa", "Fed")
+
+##Create data set
+    
+  #Initiate a loop that goes from 1 to the length of the vector above
+   for (i in 1:length(inst)){  
+
+  #The variable inst[x] refers to the relevant element of the vector. Fed into the function it filters the master-table      
+  #accordingly
+   length_institution_df <- FUN_inst(inst[i])
+   
+  #Count the number of words in the text-column. Add the result as a new column to the table  
+   length_institution_df <- length_institution_df %>%
+    mutate(length = lengths(gregexpr("\\W+", text)))
+
+##Create and print the bar-chart  
+    chart_length_institution <- ggplot(length_institution_df, aes(x = date, y = length)) +
+      geom_line(colour = "steelblue", size = 1.2) +
+      labs(x = "Speech", y = "Length of speech", title = "Length of speeches, 2009-2018", subtitle = inst[i]) +
+      scale_y_continuous(limits = c(0, 6000)) +
+      stat_smooth()
+     
+    print(chart_length_institution)
+}
+    
+```
+
+```{r Compare TOTAL AND AVERAGE LENGTH of speeches per SPEAKER for ENTIRE PERIOD}
+
+##Bar-chart average and total length of speeches for each speaker (for total time period)
+  
+  #Create table that contains both institution and average/total length
+  average_length_speaker_total_df <- cbspeeches %>% group_by(speaker) %>%
+    summarise(number = n(), total = sum(lengths(gregexpr("\\W+", text))), average = total/number) %>%
+    ungroup() %>% arrange(average)
+  
+  total_length_speaker_total_df <- cbspeeches %>% group_by(speaker) %>%
+    summarise(number = n(), total = (sum(lengths(gregexpr("\\W+", text)))/1000)) %>%
+    ungroup() %>% arrange(total)
+  
+  #Set number of digits to 0
+  average_length_speaker_total_df$average <- round(average_length_speaker_total_df$average, 0)
+  total_length_speaker_total_df$total <- round(total_length_speaker_total_df$total, 0)
+  
+  #Create chart
+  ggplot(average_length_speaker_total_df, aes(y = average, x = reorder(speaker, average), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    geom_hline(yintercept = mean(average_length_speaker_total_df$average)) +
+    labs(y="Average length of speeches 2009-2018", x="Speaker", title="Average length of speeches, 2009-2018") +
+    theme_grey() +
+    coord_flip()
+  
+  ggplot(total_length_speaker_total_df, aes(y = total, x = reorder(speaker, total), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    geom_hline(yintercept = mean(total_length_speaker_total_df$total)) +
+    labs(y="Total length of speeches 2009-2018", x="Speaker", title="Total length of speeches, 2009-2018", subtitle="in '000") +
+    theme_grey() +
+    coord_flip()
+```
+
+```{r Compare TOTAL AND AVERAGE LENGTH of speeches per SPEAKER for SINGLE YEARS}
+
+##Bar-chart average and total length of speeches for each speaker (for each year)   
+  
+  #Create and sort data sets for average and total length of speeches per year
+  average_length_speaker_year_df <- cbspeeches %>% mutate(year = year(date)) %>% group_by(year, speaker) %>%
+    summarise(number = n(), total = sum(lengths(gregexpr("\\W+", text))), average = total/number) %>%
+    ungroup() %>% arrange(year, average) %>% mutate(order = row_number())
+  
+  total_length_speaker_year_df <- cbspeeches %>% mutate(year = year(date)) %>% group_by(year, speaker) %>%
+    summarise(number = n(), total = (sum(lengths(gregexpr("\\W+", text)))/1000)) %>%
+    ungroup() %>% arrange(year, total) %>% mutate(order = row_number())
+  
+  #Set number of digits to 0
+  average_length_speaker_year_df$average <- round(average_length_speaker_year_df$average, 0)
+  total_length_speaker_year_df$total <- round(total_length_speaker_year_df$total, 0)
+  
+  #Create chart for average length
+  ggplot(average_length_speaker_year_df, aes(y = average, x = order, width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    theme_grey() +
+    geom_hline(yintercept = mean(average_length_speaker_year_df$average)) +
+    labs(y="Average length of speeches 2009-2018", x="Speaker", title="Average length of speeches, 2009-2018") +
+    facet_wrap(~year, scales="free", nrow=3) +
+    scale_x_continuous(breaks = average_length_speaker_year_df$order, labels = average_length_speaker_year_df$speaker, 
+    expand = c(0,0)) +
+    coord_flip()
+  
+  #Create chart for total length
+  ggplot(total_length_speaker_year_df, aes(y = total, x = order, width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    theme_grey() +
+    geom_hline(yintercept = mean(total_length_speaker_year_df$total)) +
+    labs(y="Total length of speeches 2009-2018", x="Speaker", title="Total length of speeches, 2009-2018", subtitle="in '000") +
+    facet_wrap(~year, scales="free", nrow=3) +
+    scale_x_continuous(breaks = total_length_speaker_year_df$order, labels = total_length_speaker_year_df$speaker, 
+    expand = c(0,0)) +
+    coord_flip()
+```
+
+```{r Plot LENGTH of speeches per SPEAKER}
+
+    FUN_spk <- function(spk)(cbspeeches %>%
+      filter(speaker == spk))
+
+    spk <- c("Andreas Dombret", "Ben Bernanke", "Benoit Coeure", "Carl-Ludwig Thiele", "Claudia Buch", "Daniele Nouy",
+             "Daniel Tarullo", "Elizabeth Duke", "Ignazio Angeloni", "Janet Yellen", "Jens Weidmann", "Jeremy Stein",
+             "Jerome Powell", "Joachim Nagel", "Joachim Wuermeling", "Joerg Asmussen", "Johannes Beermann", "Julie Dickson",
+             "Lael Brainard", "Mario Draghi", "Pentti Hakkarainen", "Peter Praet", "Randal Quarles", "Rudolf Boehmler",
+             "Sabine Lautenschlaeger", "Sarah Bloom Raskin", "Stanley Fischer", "Vitor Constancio", "Yves Mersch")
+
+    for (i in 1:length(spk)){  
+
+     length_speaker_df <- FUN_spk(spk[i])
+      
+     length_speaker_df <- length_speaker_df %>%
+      mutate(length = lengths(gregexpr("\\W+", text)))
+     
+     chart_length_speaker <- ggplot(length_speaker_df, aes(x = date, y = length)) +
+      geom_line(colour = "steelblue", size = 1.2) +
+      labs(x = "Speech", y = "Length of speech", title = "Length of speeches, 2009-2018", subtitle = spk[i]) +
+      scale_y_continuous(limits = c(0, 6000)) +
+      stat_smooth()
+     
+     print(chart_length_speaker)
+
+}
+    
+```
+
+##Dealing with the geography of speeches
+
+```{r Show the COUNTRIES where INSTITUTIONS gave speeches}
+
+##Filter cbspeeches for institution and create table that contains number of speeches per country per year
+
+    inst <- c("BuBa", "Fed", "ECB", "SSM")
+
+    for (i in 1:length(inst)){      
+
+    country_list_institution_df <- cbspeeches %>% 
+      mutate(year = year(date)) %>% 
+      select(country, year, institution) %>% 
+      filter(institution == inst[i]) %>% 
+      group_by(country, year) %>% 
+      summarise(count = n()) %>% 
+      spread(year, count) %>% 
+      replace(is.na(.), 0) 
+
+##Add a column that contains total number for each country (ie all speeches from 2014-2018)
+    country_list_institution_df <- transform(country_list_institution_df, total = rowMeans(country_list_institution_df[, 2:6]))
+
+    country_list_institution_df <- country_list_institution_df %>% select(country, total, X2018)
+    
+    colnames(country_list_institution_df) <- (c("country", "Average 2009-2018", "2018"))
+    
+    country_list_institution_df <- melt(country_list_institution_df)
+    
+    colnames(country_list_institution_df) <- (c("country", "Timeframe", "value"))
+    
+    chart_countries_institution <- ggplot(country_list_institution_df, 
+      aes(y = value, x = reorder(country, value),
+      fill=Timeframe, width = 0.9)) +
+      geom_bar(position="dodge", stat="identity") +
+      scale_fill_manual(values=c("steelblue", "red")) +
+      labs(y="Number of speeches", x=inst[i], title="Number of speeches per country", subtitle="2018 and 2009-2108") +
+      theme_grey() +
+      coord_flip()
+     
+    print(chart_countries_institution)
+  }                                                                                              
+                                                                                                                  
+``` 
+
+```{r Show the COUNTRIES where SPEAKERS gave speeches}
+
+##Filter cbspeeches for speakers and create table that contains number of speeches per country per year
+
+    spk <- c("Andreas Dombret","Benoit Coeure", "Carl-Ludwig Thiele", "Claudia Buch", "Daniele Nouy", "Daniel Tarullo", 
+               "Ignazio Angeloni", "Janet Yellen", "Jens Weidmann", "Jeremy Stein", "Jerome Powell", "Joachim Nagel", 
+               "Joachim Wuermeling", "Johannes Beermann", "Julie Dickson", "Lael Brainard", "Mario Draghi", 
+               "Pentti Hakkarainen", "Peter Praet", "Randal Quarles", "Sabine Lautenschlaeger", "Stanley Fischer", 
+               "Vitor Constancio", "Yves Mersch")
+
+    for (i in 1:length(spk)){        
+
+    country_list_speaker_df <- cbspeeches %>% 
+      mutate(year = year(date)) %>% 
+      select(country, year, speaker) %>% 
+      filter(speaker == spk[i]) %>% 
+      group_by(country, year) %>% 
+      summarise(count = n()) %>% 
+      spread(year, count) %>% 
+      replace(is.na(.), 0) 
+
+##Add a column that contains total number for each country (ie all speeches from 2014-2018)
+    country_list_speaker_df <- transform(country_list_speaker_df,
+      total = rowMeans(country_list_speaker_df[, 2:ncol(country_list_speaker_df)]))
+
+    ldf <- ncol(country_list_speaker_df)
+   
+    country_list_speaker_df <- country_list_speaker_df %>% select(country, total, ldf-1)
+    
+    colnames(country_list_speaker_df) <- (c("country", "Average 2009-2018", "2018"))
+    
+    country_list_speaker_df <- melt(country_list_speaker_df)
+    
+    colnames(country_list_speaker_df) <- (c("country", "Timeframe", "value"))
+    
+    chart_countries_speaker <- ggplot(country_list_speaker_df, 
+       aes(y = value, x = reorder(country, value),
+       fill=Timeframe, width = 0.9)) +
+      geom_bar(position="dodge", stat="identity") +
+      scale_fill_manual(values=c("steelblue", "red")) +
+      labs(y="Number of speeches", x=spk[i], title="Number of speeches per country", subtitle="2018 and 2009-2108") +
+      theme_grey() +
+      coord_flip()
+     
+    print(chart_countries_speaker)
+  }                                                                                              
+                                                                                                                  
+``` 
+
+
+##Dealing with the redability of speeches
+
+```{r Prepare the table for the analysis - not using cbspeeches but the original Excel-file}
+
+  speeches_flesch <- read_excel("J:/Secretariat/08 Other/Research/01 Data/Raw Data - All Speeches 2009-2018.xlsx")
+
+  speeches_flesch <- speeches_flesch %>%
+    select(c(Date, Speaker, Institution, Length, Flesch, Language)) %>% 
+    rename(date = Date, speaker = Speaker, institution = Institution, length = Length,
+           flesch = Flesch, language = Language)
+
+  speeches_flesch$institution <- gsub("BuBa", "Bundesbank", speeches_flesch$institution)
+  speeches_flesch$institution <- gsub("ECB", "ECB Central Banking", speeches_flesch$institution)
+  speeches_flesch$institution <- gsub("SSM", "ECB Banking Supervision", speeches_flesch$institution)
+  speeches_flesch$institution <- gsub("Fed", "Federal Reserve", speeches_flesch$institution)
+  speeches_flesch$institution <- gsub("BoE", "Bank of England", speeches_flesch$institution)
+  
+```
+
+```{r Calculate the Flesch-Kincaid index for institutions}
+
+##Flesch institutions entire period
+  
+  #Create dataset, kicking out speeches in German, kicking out the BoE 
+  speeches_average_inst_total_df <- speeches_flesch %>%
+   filter(language == "EN") %>%
+   mutate(product = (length*flesch))
+   
+  #Group by institution and calculate weighted average of Flesch
+  speeches_average_inst_total_df <- speeches_average_inst_total_df %>%
+   group_by(institution) %>%
+   summarise(sum(product, na.rm = TRUE)/sum(length, na.rm = TRUE)) 
+   
+  #Rename columns to avoid having a very long variable name for the chart
+  colnames(speeches_average_inst_total_df) <- (c("Institution", "Flesch"))
+   
+  #Draw the bar-chart
+  ggplot(speeches_average_inst_total_df, aes(y = Flesch, x = reorder(Institution, Flesch), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    labs(y="Flesch-Kincaid Readability", x="Institution", title="Flesch-Kincaid Readbility of Speeches,    
+         2009-2018",
+      subtitle="Weigthed Average") +
+    geom_hline(yintercept = mean(speeches_average_inst_total_df$Flesch)) +
+    theme_grey() +
+    coord_flip()
+
+    
+##Flesch institutions from 2017
+  
+  #Create dataset, kicking out speeches in German, kicking out the BoE, kicking out Luc Coene (who results in an empty row)
+  #speeches_average_inst_2017_df <- speeches_flesch %>%
+   #mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+   #mutate(year = year(date)) %>% 
+   #filter(speaker != "Luc Coene" & language == "EN" & institution != "BoE" & year %in% c("2017", "2018")) %>%
+   #mutate(product = (length*flesch))
+  
+  #Group by institution and calculate weighted average of Flesch 
+  #speeches_average_inst_2017_df <- speeches_average_inst_2017_df %>%
+   #group_by(institution) %>%
+   #summarise(sum(product, na.rm = TRUE)/sum(length, na.rm = TRUE))
+  
+  #Rename columns to avoid having a very long variable name for the chart 
+  #colnames(speeches_average_inst_2017_df) <- (c("Institution", "Flesch"))
+  
+  #Draw the bar-chart
+  #ggplot(speeches_average_inst_2017_df, aes(y = Flesch, x = reorder(Institution, Flesch), width=0.8)) +
+    #geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    #labs(y="Flesch-Kincaid Readability", x="Institution", title="Flesch-Kincaid Readbility of Speeches, 2012-2018",
+      #subtitle="Weigthed Average") +
+    #geom_hline(yintercept = mean(speeches_average_inst_2017_df$Flesch)) +
+    #theme_grey() +
+    #coord_flip()
+
+```
+
+```{r Calculate the Flesch-Kincaid index for speakers}
+
+##Flesch speakers entire period
+  
+  speeches_average_spk_total_df <- speeches_flesch %>%
+   filter(language == "EN" & institution != "BoE" & speaker !="Luc Coene") %>%
+   mutate(product = (length*flesch))
+   
+  speeches_average_spk_total_df <- speeches_average_spk_total_df %>%
+   group_by(speaker) %>%
+   summarise(sum(product, na.rm = TRUE)/sum(length, na.rm = TRUE))
+  
+  colnames(speeches_average_spk_total_df) <- (c("Speaker", "Flesch"))
+   
+  ggplot(speeches_average_spk_total_df, aes(y = Flesch, x = reorder(Speaker, Flesch), width=0.8)) +
+    geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    labs(y="Flesch-Kincaid Readability", x="Speaker", title="Flesch-Kincaid Readbility of Speeches, 2009-2018",
+      subtitle="Weigthed Average") +
+    geom_hline(yintercept = mean(speeches_average_spk_total_df$Flesch)) +
+    theme_grey() +
+    coord_flip()
+   
+##Flesch speakers from 2017
+  
+  #speeches_average_spk_2017_df <- speeches_flesch %>%
+   #mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+   #mutate(year = year(date)) %>% 
+   #filter(language == "EN" & institution != "BoE" & year %in% c("2017", "2018") & speaker != "Julie Dickson") %>%
+   #mutate(product = (length*flesch))
+   
+  #speeches_average_spk_2017_df <- speeches_average_spk_2017_df %>%
+   #group_by(speaker) %>%
+   #summarise(sum(product, na.rm = TRUE)/sum(length, na.rm = TRUE))  
+  
+  #colnames(speeches_average_spk_2017_df) <- (c("Speaker", "Flesch"))
+   
+  #ggplot(speeches_average_spk_2017_df, aes(y = Flesch, x = reorder(Speaker, Flesch), width=0.8)) +
+    #geom_bar(stat="identity", color="steelblue", fill="steelblue") +
+    #labs(y="Flesch-Kincaid Readability", x="Speaker", title="Flesch-Kincaid Readbility of Speeches, 2017-2018",
+      #subtitle="Weigthed Average") +
+    #geom_hline(yintercept = mean(speeches_average_spk_2017_df$Flesch)) +
+    #theme_grey() +
+    #coord_flip()
+  
+```
+
+```{r Plot development of Flesch-Index for entire dataset over entire period}
+
+  
+  speeches_flesch <- speeches_flesch %>% filter(language == "EN" & institution != "Bank of England")
+
+  speeches_flesch_plot <- speeches_flesch %>%
+     mutate(year = year(date)) %>% 
+     mutate(product = (length*flesch)) %>%
+     group_by(year) %>%
+     summarise(sum(product, na.rm = TRUE)/sum(length, na.rm = TRUE))
+
+  colnames(speeches_flesch_plot) <- (c("Year", "Flesch"))
+
+  ggplot(speeches_flesch_plot, aes(x = Year, y = Flesch)) +
+     geom_line(colour = "steelblue", size = 1.2) +
+     labs(x = "Year", y = "Flesch Index (weighted average)", title = "Flesch-Index (weighted average)") +
+     scale_y_continuous(limits = c(10, 60))
+
+```
+     

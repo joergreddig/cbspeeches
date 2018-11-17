@@ -1,0 +1,936 @@
+---
+title: "Text Mining Speeches"
+author: "Joerg Redding; Sebastian Ahlfeld"
+date: "June 18, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+##Preparing the dataset/corpus
+
+```{r Initiate Programme}
+
+##Load packages
+  ##library(cbspeeches)
+  ##library(devtools)
+  library(dplyr)
+  library(ggplot2)
+  library(koRpus)
+  library(lubridate)
+  library(lubridate)
+  library(qdapDictionaries)
+  library(qdapRegex)
+  library(qdapTools)
+  library(quanteda)
+  library(readtext)
+  library(readxl)
+  library(reshape2)
+  library(sentimentr)
+  library(stringi)
+  library(stringr)
+  library(tidyr)
+  library(tidytext)
+  library(tidyverse)
+  library(topicmodels)
+  library(tm)
+  library(wordcloud)
+
+##Set global options
+  options (stringsAsFactors=F)
+
+```
+
+```{r Option 1: Create the data set from scratch}
+
+##Create a table containing the actual text of the speeches 
+
+  #read the speeches from the text/pdf files
+  cbspeeches <- readtext("J:/Secretariat/08 Other/Research/04 Speeches All/*",
+                 docvarsfrom = "filenames", 
+                 docvarnames = c("date", "institution", "speaker"),
+                 dvsep = " - ")
+
+  # delete all special characters in the text
+  cbspeeches$text <- gsub('\n','', cbspeeches$text)
+  cbspeeches$text <- gsub('\"','', cbspeeches$text)
+
+  # cleaning up the date values, which might contain a letter for the speech
+  cbspeeches$date <- str_replace(cbspeeches$date, "[ab]", "")
+
+  # change date column from string into  date format:
+  cbspeeches <- cbspeeches %>%
+    mutate(date = as.Date(date, format = "%Y-%m-%d"))
+
+
+##Create table that contains all the rest of the information
+
+  #Read Excel-File
+  speeches_overview <- read_excel("J:/Secretariat/08 Other/Research/01 Data/Raw Data - All Speeches 2011-2018.xlsx")
+
+  speeches_overview <- speeches_overview %>%
+    select(c(Filename, City, Country, Event, Title, Language)) %>% 
+    rename(doc_id = Filename, city = City, country = Country, event = Event, title = Title, language = Language)
+
+  #Match the two tables to create the full data set
+  cbspeeches <- inner_join(cbspeeches, speeches_overview)
+
+```
+
+```{r Option 2: Just load the dataset from github or from a local folder}
+
+##Option 1 - Private PC: Load directly from github (does not work from ECB Computers)
+  #download.file("https://raw.github.com/joergreddig/cbspeeches/master/data/cbspeeches.rda", 
+    #destfile = "D:/Eigene Dateien/Research/01 R-Files/cbspeeches.rda") 
+  #load(file = "D:/Eigene Dateien/Research/01 R-Files/cbspeeches.rda")
+  
+  
+##Option 2 - Office PC: Create dataframe containing all speeches
+  load(file = "J:/Secretariat/08 Other/Research/07 R-Files/data/cbspeeches.rda")
+
+  
+##Option 3 - Load data via the cbspeeches library
+  #data(cbspeeches)
+  
+```
+
+```{r Define dictionaries containing bigrams and trigrams to be used for some of the analyses}
+
+##Purpose: allows r to bind them together and treat them as one word later.
+
+##Create a dictionary that contains the most frequent (and sensible) bigrams from ECB/SSM and Bundesbank speeches
+
+  dict_bigrams <- dictionary(list(
+      A = c("adjustment path",
+            "advanced economies",
+            "adverse scenario",
+            "antivirus scanner",
+            "asset price",
+            "asset prices",
+            "asset purchase",
+            "asset purchases",
+            "asset purchases",
+            "asset quality",
+            "audit functions"),
+      B = c("balance sheet",
+            "balance sheets",
+            "bank failures",
+            "bank lending",
+            "bank supervisors",
+            "banking groups",
+            "banking industry",
+            "banking market",
+            "banking markets",
+            "banking regulation",
+            "banking sector",
+            "banking sectors",
+            "banking services",
+            "banking supervision",
+            "banking supervisor",
+            "banking supervisors",
+            "banking system",
+            "banking union",
+            "basel committee",
+            "basel iii",
+            "basis points",
+            "best practices",
+            "blockchain technology",
+            "bond market",
+            "broad based",
+            "burden sharing",
+            "business cycle",
+            "business model",
+            "business models"),
+      C = c("capital flows",
+            "capital key",
+            "capital market",
+            "capital markets",
+            "capital requirements",
+            "cash cycle",
+            "cash payment",
+            "cash payments",
+            "cashless payment",
+            "cashless payments",
+            "central bank",
+            "central banks",
+            "central clearing",
+            "chinese currency",
+            "chinese government",
+            "clearing bank",
+            "clearing banks",
+            "clearing members",
+            "community bank",
+            "community banks",
+            "comprehensive assessment",
+            "consumer protection",
+            "cost efficiency",
+            "crd iv",
+            "credit easing",
+            "credit institutions",
+            "credit risk",
+            "credit standards",
+            "crisis countries",
+            "crisis management",
+            "cross border",
+            "current account",
+            "cyclical recovery"),
+      D = c("data gaps",
+            "debt crisis",
+            "debt sustainability",
+            "decision making",
+            "deposit insurance",
+            "deutsche boerse",
+            "deutsche bundesbank",
+            "digital banking",
+            "digital city",
+            "digital currency",
+            "digital financial",
+            "digital infrastructure",
+            "distributed ledger",
+            "dodd frank",
+            "domestic demand",
+            "downside risks",
+            "downward pressure"),
+      E = c("ecb staff",
+            "economic activity",
+            "economic growth",
+            "economic policies",
+            "economic policy",
+            "economic recovery",
+            "economic slack",
+            "euro area",
+            "euro banknotes",
+            "european commission",
+            "european court justice",
+            "european integration",
+            "european parliament",
+            "european union",
+            "excess liquidity",
+            "exchange rate",
+            "exchange rates",
+            "executive board"),
+      F = c("federal reserve",
+            "federal budget",
+            "financial centre",
+            "financial centres",
+            "financial conditions",
+            "financial crises",
+            "financial crisis",
+            "financial cycle",
+            "financial education",
+            "financial globalisation",
+            "financial instability",
+            "financial institutions",
+            "financial integration",
+            "financial knowledge",
+            "financial literacy",
+            "financial market",
+            "financial markets",
+            "financial reporting",
+            "financial sector",
+            "financial services",
+            "financial stability",
+            "financial system",
+            "financial systems",
+            "financing conditions",
+            "first pillar",
+            "first world war",
+            "fiscal policies",
+            "fiscal policy",
+            "fiscal rules",
+            "fiscal union",
+            "foreign investors",
+            "forward guidance",
+            "free trade",
+            "funding conditions"),
+      G = c("gdp growth",
+            "general public",
+            "global economy",
+            "good governance",
+            "governance risk",
+            "governing council",
+            "government bond",
+            "government bonds",
+            "government debt",
+            "government securities",
+            "granular data",
+            "green finance"),
+      H = c("headline inflation",
+            "high level",
+            "high quality",
+            "household debt",
+            "housing market"),
+      I = c("immune system",
+            "individual banks",
+            "individual responsibility",
+            "inflation expectations",
+            "inflation rate",
+            "inflation rates",
+            "inflation targeting",
+            "information technology",
+            "instant payment",
+            "instant payments",
+            "interest income",
+            "interest rate",
+            "interest rate risk",
+            "interest rates",
+            "internal audit",
+            "internal auditors",
+            "internal models",
+            "investment funds"),
+      L = c("labour market",
+            "large banks",
+            "legal framework",
+            "legal tender",
+            "lending rates",
+            "leverage ratio",
+            "leveraged finance",
+            "liability principle",
+            "long run",
+            "long term",
+            "longer term",
+            "low inflation",
+            "low interest",
+            "lower bound"),
+      M = c("maastricht treaty",
+            "machine learning",
+            "macro prudential",
+            "macroprudential instruments",
+            "macroprudential policy",
+            "market economy",
+            "market forces",
+            "market functioning",
+            "market infrastructure",
+            "market infrastructures",
+            "market liquidity",
+            "market participants",
+            "market risk",
+            "market segments",
+            "medium term",
+            "medium sized",
+            "member state",
+            "member states",
+            "micro data",
+            "micro prudential",
+            "monetary accommodation",
+            "monetary financing",
+            "monetary policy",
+            "monetary policymakers",
+            "monetary union",
+            "money market",
+            "mortgage loans",
+            "mutual understanding"),
+      N = c("national authorities",
+            "national level",
+            "national responsibility",
+            "national supervisors",
+            "negative rates",
+            "net purchases",
+            "new technology",
+            "new york",
+            "nominal rates",
+            "non banks",
+            "non standard"),
+      O = c("oil prices",
+            "output gap"),
+      P = c("pan european",
+            "payment behaviour",
+            "payment initiation",
+            "payment instruments",
+            "payment methods",
+            "payment service",
+            "payment services",
+            "payment solutions",
+            "payment system",
+            "payment systems",
+            "payment transactions",
+            "phillips curve",
+            "policy evaluation",
+            "policy makers",
+            "policy measures",
+            "policy rates",
+            "policy stance",
+            "policy transmission",
+            "portfolio rebalancing",
+            "post crisis",
+            "post trade",
+            "potential growth",
+            "potential output",
+            "pre crisis",
+            "preferential treatment",
+            "price pressures",
+            "price stability",
+            "Private sector",
+            "productivity growth",
+            "property rights",
+            "prudential requirements",
+            "prudential treatment",
+            "public consultation",
+            "public debt",
+            "public finances",
+            "public sector"),
+      R = c("rating agencies",
+            "real economy",
+            "real estate",
+            "real gdp",
+            "real time",
+            "real rates",
+            "refinancing operations",
+            "regulatory agencies",
+            "regulatory arbitrage",
+            "regulatory framework",
+            "regulatory reforms",
+            "repo market",
+            "reporting requirements",
+            "resolution authority",
+            "retail payment",
+            "retail payments",
+            "risk appetite",
+            "risk management",
+            "risk profile",
+            "risk sharing",
+            "risk taking",
+            "rmb clearing"),
+      S = c("safe assets",
+            "savings bank",
+            "savings banks",
+            "securities settlement",
+            "second pillar",
+            "service providers",
+            "settlement systems",
+            "shadow banking",
+            "short term",
+            "side effects",
+            "significant banks",
+            "significant institutions",
+            "single currency",
+            "single market",
+            "single rulebook",
+            "sino german",
+            "small banks",
+            "small institutions",
+            "smaller banks",
+            "smaller institutions",
+            "smooth implementation",
+            "sovereign bonds",
+            "sovereign debt",
+            "ssm regulation",
+            "state aid",
+            "stress test",
+            "stress testing",
+            "stress tests",
+            "structural reforms",
+            "supervision board",
+            "supervisory approach",
+            "supervisory authorities",
+            "supervisory authority",
+            "supervisory board",
+            "supervisory mechanism",
+            "supervisory practices",
+            "supervisory priorities",
+            "systemic risk",
+            "systemic risks",
+            "systemically important"),
+      T = c("term premium",
+            "thematic review"),
+      U = c("underlying inflation",
+            "united kingdom",
+            "united states"),
+      V = c("virtual currencies"),
+      W = c("wall street",
+            "world war"),
+      Y = c("yield curve")
+      ))
+
+
+##Create a dictionary that contains the most frequent (and sensible) trigrams from ECB/SSM and Bundesbank speeches
+
+  dict_trigrams <- dictionary(list(
+      A = c("accommodative monetary policy",
+            "application programming interfaces",
+            "asset backed securities",
+            "asset purchase programme",
+            "asset purchase programmes",
+            "asset quality review"),
+      B = c("bank lending channel",
+            "bank lending survey"),
+      C = c("capital markets union",
+            "capital requirements directive",
+            "capital requirements regulation",
+            "chinese central bank",
+            "cost income ratio"),
+      D = c("data gaps initiative",
+            "deposit guarantee scheme",
+            "deposit guarantee schemes",
+            "deposit insurance scheme",
+            "deutsche boerse group",
+            "distributed ledger technology",
+            "dodd frank act"),
+      E = c("ecb banking supervision",
+            "effective lower bound",
+            "european banking authority",
+            "european banking supervision",
+            "european central bank",
+            "european court justice",
+            "european deposit insurance",
+            "european monetary fund",
+            "european stability mechanism",
+            "expansionary monetary policy"),
+      F = c("federal reserve board",
+            "federal reserve system",
+            "federal funds rate",
+            "financial market infrastructures",
+            "financial stability board",
+            "financial stability committee",
+            "financial stability review",
+            "first world war",
+            "fit and proper",
+            "five presidents report"),
+      G = c("general equilibrium analysis",
+            "global financial crisis",
+            "global value chains"),
+      H = c("hans werner sinn",
+            "high frequency trading"),
+      I = c("individual national responsibility",
+            "institutional protection schemes",
+            "interest rate risk"),
+      J = c("joint supervisory teams",
+            "joint supervision teams"),
+      
+      K = c("karl otto poehl"),
+      L = c("less significant institutions",
+            "level playing field",
+            "loss absorbing capacity",
+            "low interest rate"),
+      M = c("macro prudential policy",
+            "main refinancing rate",
+            "market based finance",
+            "medium sized banks",
+            "monetary policy stance",
+            "monetary policy transmission"),
+      N = c("national options discretions",
+            "negative interest rates",
+            "negative interest rate",
+            "new york fed",
+            "nominal interest rates",
+            "non objection procedure",
+            "non performing exposures",
+            "non performing loans",
+            "non standard measures"),
+      O = c("outright monetary transactions",
+            "options and discretions"),
+      P = c("payment services directive",
+            "public sector bonds"),
+      R = c("real disposable income",
+            "real estate market",
+            "real estate markets",
+            "real interest rate",
+            "real interest rates",
+            "regulatory technical standards",
+            "retail payments board",
+            "retail payments market",
+            "return on equity",
+            "risk appetite framework",
+            "risk appetite frameworks"),
+      S = c("shadow banking sector",
+            "short term rates",
+            "single european rulebook",
+            "single resolution fund",
+            "single resolution mechanism",
+            "single supervisory mechanism",
+            "small banking box",
+            "sovereign bank nexus",
+            "sovereign debt crisis",
+            "stability growth pact",
+            "systemically important banks"),
+      T = c("total factor productivity",
+            "third pillar"),
+      U = c("unconventional monetary policy",
+            "unit labour costs"),
+      Z = c("zero lower bound")
+      ))      
+
+
+##Find the most frequent n-grams in speeches to use them as a basis for the dictionary. (Only works speaker by speaker on ECB computers due to lack of RAM)
+ 
+ #Create the dataframe which serves as a basis for the corpus (it derives from the dataset built above)
+  #data_for_corpus_bigram <- data_for_corpus_df %>% filter(institution == "BuBa" & language == "EN")
+
+ #Create and clean up a volatile corpus (tm package) on which to run the n-gram identification routine  
+ 
+  #corpus <- VCorpus(DataframeSource(data_for_corpus_bigram))
+
+  #corpus <- tm_map(corpus, removeNumbers)
+  #corpus <- tm_map(corpus, content_transformer(tolower))
+  #corpus <- tm_map(corpus, removePunctuation)
+  #corpus <- tm_map(corpus, stripWhitespace)
+  #corpus <- tm_map(corpus, removeWords, stopwords("English"))
+ 
+ #Define how big the word-cluster should be
+ #BigramTokenizer <- function(x) unlist(lapply(ngrams(words(x), 2), paste, collapse = " "), use.names = FALSE)
+ 
+ #Create the Matrix
+ #tdm <- TermDocumentMatrix(corpus, control = list(tokenize = BigramTokenizer))
+ 
+ #Count frequency of nGrams 
+ #freqr <- rowSums(as.matrix(tdm))
+ 
+ #Create Sort Order
+ #ordr <- order(freqr, decreasing=TRUE)
+ 
+ #Show x most frequent nGrams
+ #list <- freqr[head(ordr, 20)]
+
+ #write.csv(list, file="J:/Secretariat/08 Other/Research/top20.csv")
+
+```
+
+```{r Create and clean-up a dataframe from which to extract the corpus}
+
+##Create subset of the master table (cbspeeches) to analyse institutions/speakers
+
+    data_for_corpus_df <- cbspeeches %>%
+      select(doc_id, text, institution, speaker, language)
+
+
+##For German speeches replace "Umlaute"" and ß with standard letters
+  
+  data_for_corpus_df$text <- gsub("ä", "ae", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("Ä", "Ae", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("ö", "oe", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("Ö", "Oe", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("ü", "ue", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("Ü", "Ue", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("ß", "ss", data_for_corpus_df$text)
+
+##For American speeches replace some American English with British English
+  
+  data_for_corpus_df$text <- gsub("labor", "labour", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("programmes", "programs", data_for_corpus_df$text)
+  data_for_corpus_df$text <- gsub("programme", "program", data_for_corpus_df$text)
+ 
+##Set encoding to latin to avoid encoding error when creating the tdm. Probably not always necessary
+
+  #Encoding(data_for_corpus_df$text) = "latin1"  
+
+    
+##Remove any remaining special characters from text to avoid encoding error when creating the tdm
+
+  data_for_corpus_df$text <- gsub("[^[:alnum:]]", " ", data_for_corpus_df$text, ignore.case = TRUE)
+  data_for_corpus_df$text <- gsub("[^0-9A-Za-z///' ]"," " , data_for_corpus_df$text ,ignore.case = TRUE)
+
+  
+##Remove one letter words to get rid of artifact letters which originate from removing the ' in bank's, for instance
+  
+  data_for_corpus_df$text <- gsub(" *\\b[[:alpha:]]{1}\\b *", " ", data_for_corpus_df$text)
+
+```
+
+```{r Option 1: Use TM-PACKAGE to create and clean-up the corpus; create term-document matrix}
+
+##Create a (volatile) corpus from the dataframe
+
+  corpus <- VCorpus(DataframeSource(data_for_corpus_df))
+
+##Clean up the corpus
+
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+
+  
+##Remove stopwords such as "a", "and", "or". Might not be sensible for all analyses ...
+  
+  corpus <- tm_map(corpus, removeWords, stopwords("English"))
+
+  
+##Create Term Document Matrix and transform it to an actual matrix
+
+  tdm <- TermDocumentMatrix(corpus, control = list(weighting=weightTf))
+  tdm_matrix <- as.matrix(tdm)
+
+##Create Document Term Matrix and transform it to an actual matrix
+  
+  dtm <- DocumentTermMatrix(corpus, control = list(weighting=weightTfIdf))
+  dtm_matrix <- as.matrix(dtm)
+
+```
+
+```{r Option 2: Use QUANTEDA-PACKAGE to create and clean-up the corpus; create term-document matrix}
+
+##Create a corpus from the dataframe
+
+  corpus <- corpus(data_for_corpus_df)
+
+##Create Term Document Matrix, clean it up and transform it to an actual matrix (needs to be transposed)
+
+  tdm <- dfm(corpus, tolower = TRUE, stem = FALSE, remove = stopwords("english"), remove_punct = TRUE, remove_numbers = TRUE)
+  
+  tdm_matrix <- as.matrix(tdm)
+  tdm_matrix <- t(tdm_matrix)
+  
+```
+
+##Keyness Analysis
+
+```{r Assess the KEYNESS of certain terms, using the Quanteda-Package}
+
+##Filter cleaned-up table (data_for_corpus_df) to compare terms used by institutions/speakers. Then put all words to lower case
+
+    data_for_keyness_df <- data_for_corpus_df %>%
+    filter(speaker %in% c("Sabine Lautenschlaeger", "Daniele Nouy") & language == "EN" & institution == "SSM") %>%
+    select(doc_id, text, speaker)
+
+    data_for_keyness_df$text <- tolower(data_for_keyness_df$text)
+
+
+##Remove some words which might pop up in the results without adding any additional information
+    
+    data_for_keyness_df$text <- data_for_keyness_df$text %>%
+      str_replace_all(c(" although " = " ",
+                        " many " = " ",
+                        " ladies " = " ",
+                        " gentlemen " = " ",
+                        " however " = " ",
+                        " like " = " ",
+                        " across" = " ",
+                        " regard" = " ",
+                        " say" = " ",
+                        " may" = " ",
+                        " slide" = " ",
+                        " view" = " ",
+                        " activities" = " ",
+                        " today" = " ",
+                        " 2017" = " ",
+                        " use" = " ",
+                        " therefore" = " ",
+                        " let " = " ",
+                        " including " = " ",
+                        " towards " = " ",
+                        " example " = " ",
+                        " even " = " ",
+                        " 2016 " = " ",
+                        " 2015 " = " ",
+                        " countries " = " ",
+                        " fully " = " ",
+                        " things" = " "))
+
+##Align singular and plura of some words so that R can treat them as one term   
+    
+    data_for_keyness_df$text <- data_for_keyness_df$text %>%
+      str_replace_all(c(" rates " = " rate ",
+                        " ratess " = " rate ",
+                        " supervisors " = " supervisor ",
+                        " banks " = " bank ",
+                        " policies " = " policy ",
+                        " supervisor " = " supervision ",
+                        " supervised " = " supervision ",
+                        " supervisory " = " supervision ",
+                        " supervision board " = " supervisory board ",
+                        " jsts" = "joint_supervisory_teams",
+                        " german " = " germany ",
+                        " rate of inflation " = " inflation "
+                        ))
+
+##Create corpus from which to compare the speakers/institutions   
+
+    corpus_keyness <- corpus(data_for_keyness_df)
+ 
+   
+##Tokenize the corpus so that n-grams can be merged
+    
+    corpus_keyness <- tokens(corpus_keyness)
+
+     
+##Merge bigrams and trigrams based on the dictionaries defined above
+    
+    corpus_keyness <- tokens_compound(corpus_keyness, dict_trigrams, concatenator = "_")
+    corpus_keyness <- tokens_compound(corpus_keyness, dict_bigrams, concatenator = "_")
+    
+     
+##Create the Term-Document-Matrix, and remove stopwords
+    
+    tdm_keyness <- dfm(corpus_keyness, remove = stopwords("english"), removeNumbers = TRUE, groups = "speaker")
+
+
+##Apply the keyness-function from the quanteda package to produce the statistics. The target is compared to the rest of the corpus
+
+    keyness_df <- textstat_keyness(tdm_keyness, target = "Sabine Lautenschlaeger")
+
+    
+##Produce the chart  
+    
+    chart_keyness <- textplot_keyness(keyness_df, margin = 0.2)
+    print(chart_keyness)
+
+```
+
+
+##Analaysis of term-frequencies over time
+
+```{r Analyse how the use of specific terms changed over time}
+
+
+##Create the dataframe by filtering the master table 
+
+  word_count_df <- cbspeeches %>% filter(institution == "BuBa")
+
+
+##Define the term
+  
+  term <- "crisis"
+
+  
+##Add a column that contains the number of times the relevant term was used. DEFINE TERM ALSO HERE!
+  word_count_df <- word_count_df %>%
+    mutate(year = year(date)) %>%
+    mutate(word = str_count(word_count_df$text, "\\bexit\\b")) %>%
+    mutate(words = lengths(gregexpr("\\W+", text)))
+    
+  
+##Group the table by year to show how often the term was used in each year
+  
+  word_count_df <- word_count_df %>%
+    group_by(year) %>%
+    summarise(termshare = ((sum(word)/sum(words))*100)) %>%
+    ungroup()
+  
+  word_count_df$year = as.Date(as.character(word_count_df$year), "%Y")
+
+##Create a line chart that shows how the usage of the term developed
+  
+  chart_word_count <- ggplot(word_count_df, aes(x = year, y = termshare)) +
+      geom_line(colour = "steelblue", size = 1.2) +
+      labs(x = "Year", y = "Average frequency of term", title = term,
+           subtitle = "Average frequency of term for Bundesbank, 2014-2018") +
+      scale_y_continuous(limits = c(0, 0.012))
+      
+  print(chart_word_count)
+  
+```
+
+
+##Sentiment Analysis
+
+```{r Assess the sentiment of speeches, using tidytext}
+
+## Load the sentiment dictionaries provided by tidytext (MIGHT NEED TO BE ADAPTED TO CENTRAL BANKING)
+
+  data(sentiments)
+
+
+##The dictionary combines three different ones; split it up to use them separately
+
+  afinn_dict <- sentiments %>% filter(lexicon=="AFINN")
+  bing_dict <- sentiments %>% filter(lexicon=="bing")
+  nrc_dict <- sentiments %>% filter(lexicon=="nrc")
+
+
+##Subset the dataframe, depending on which speaker or institution should be assessed  
+    
+  #Define speaker or institution
+    obj <- "Sabine Lautenschlaeger"
+  
+  #Subset dataframe
+    data_for_sentiment_df <- data_for_corpus_df %>% filter(speaker == eval(obj))
+
+  
+##Create the Corpus and clean it up
+  
+  sentiment_corp <- VCorpus(VectorSource(data_for_sentiment_df$text))
+
+  sentiment_corp <- tm_map(sentiment_corp, removePunctuation)
+  sentiment_corp <- tm_map(sentiment_corp, stripWhitespace)
+  sentiment_corp <- tm_map(sentiment_corp, removeNumbers)
+
+
+##Create the Document-Term-Matrix and convert it to the tidy format    
+  
+  sentiment_dtm <- DocumentTermMatrix(sentiment_corp)
+
+  sentiment_tidy_dtm <- tidy(sentiment_dtm)
+
+  
+##Assign names to the columns of the tidy dtm and set the speech_number as the index for the data  
+
+  colnames(sentiment_tidy_dtm) <- c("speech_number", "word", "count")
+
+  sentiment_tidy_dtm$speech_number <- as.numeric(sentiment_tidy_dtm$speech_number)
+
+  
+##Select columns from the bing-dictionary that was created above
+
+  bing_dict <- bing_dict %>%
+    select(word, sentiment, lexicon)
+
+  
+##Pick those words from the speeches that have a match in the bing-dictionary, ie the words that carry a sentiment
+  
+  #Match the words
+    sentiment_df <- inner_join(sentiment_tidy_dtm, bing_dict)
+
+  #Count how often the words appear. The counting is done per speech  
+    sentiment_df <- count(sentiment_df, sentiment, index=speech_number)
+
+  #Spread the results over a new table
+    sentiment_df <- spread(sentiment_df, sentiment, n, fill=0)
+
+  #Create a new column in the table that shows the difference between the number of positive and negative words in a spech 
+    sentiment_df$polarity <- (sentiment_df$positive)-(sentiment_df$negative)
+
+  #Create a new colum that says "pos" when polarity is >=0 and "neg" when polarity is <0  
+    sentiment_df$pos <- ifelse(sentiment_df$polarity >=0, "pos", "neg")
+
+##Plot the results of the sentiment analysis    
+
+    ggplot(sentiment_df, aes(x=index, y=polarity)) +
+      stat_smooth() +
+      labs(x = "Speech", y = "Polarity (>=0 means positive; <0 means negative", title = "Sentiment of speeches",
+           subtitle = obj)
+      
+```
+
+##Clustering of speeches
+
+```{r Cluster speeches using spherical k-means clustering}
+
+  #It might be necessary to modify the dataset to fit the analysis. To do so, filter speeches_overview and create the corpus 
+  #and the dtm based on the filtered table.  
+
+  #Apply the algorithm to the Document-Term-Matrix created above (number after the first comma determines number of clusters)
+    
+    cluster <- skmeans(dtm_matrix, 2, m = 1.2, control = list(nruns = 5, verbose = T))
+
+  #Draw a bar-plot which shows the different clusters and the respective number of speeches
+
+    barplot(table(cluster$cluster), main = "Clusters of Speeches")
+    
+  #Draw a silhouette plot which shows the different clusters and their fit
+    
+    plot(silhouette(cluster))
+    
+  #Draw a word cloud which shows the x words that more than others determine the clusters
+    
+    clusters_for_cloud <- t(cl_prototypes(cluster))
+    comparison.cloud(clusters_for_cloud, max.words = 100)
+
+```
+
+```{r Topic Modelling using the LDA-package}
+
+
+
+```
+
+##Testing Grounds
+
+data_for_names_df <- data_for_corpus_df %>%
+  filter(institution == "ECB" & language == "EN")
+  
+names <- str_extract_all(data_for_names_df$text, "[A-Z][a-z]{1,}[:blank:][A-Z][a-z]{1,}[:blank:][A-Z][a-z]{1,}")
+
+writeLines(unlist(names), "J:/Secretariat/08 Other/Research/names_ecb2.txt")
+
+

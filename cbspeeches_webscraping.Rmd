@@ -7,6 +7,15 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+##--------- Loading packages ----------##
+
+library(tidyverse)
+library(rvest)
+library(V8)
+
+
+
 ```
 
 
@@ -33,16 +42,356 @@ Selector gadget (from <www.selectorgadget.com>) helps to easily identify the sel
 
 
 https://stat4701.github.io/edav/2015/04/02/rvest_tutorial/
-
 https://stackoverflow.com/questions/39246739/downloading-multiple-files-using-download-file-function-in-r
 
+
+
+## ECB speeces
+
+* YT tutorial: https://www.youtube.com/watch?v=82s8KdZt5v8
+* Datacamp tutorial: https://www.datacamp.com/community/tutorials/r-web-scraping-rvest
+
+
 ```{r}
-library(rvest)
+ecb_url <- "https://www.ecb.europa.eu/press/key/date/%d/html/index.en.html"
 
 
-url_base <- "https://www.bankofengland.co.uk/speech/speeches"
+## function to retrieve list of the links to ecb speeches
+get_speech_list_ecb <- function (i) {
+    
+    # concatenate the ecb url with the iterator
+    page <- read_html(sprintf(ecb_url, i)) 
 
+    # create vector of all speech links
+    speech_links <- tibble(
+        links = html_attr(html_nodes(page, ".doc-subtitle+ .ecb-langSelector a"), "href")
+    )
+}
+
+
+
+ecb_homepage <- "https://www.ecb.europa.eu"
+
+
+# function for storing the speech texts in a data frame 
+scrape_ecb <- function (i) {
+    # blablabla
+    page <- read_html(paste0(ecb_homepage, ecb_links[i, ]))
+
+    # create data frame for storing the speech texts and metadata
+    ecb_speeches <- tibble(
+        date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
+        title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
+        subtitle = html_text(html_nodes(page, ".ecb-pressContentSubtitle")),
+        text     = paste(html_text(html_nodes(page, "#ecb-content-col li , article p")), collapse = ""), ###instead of only article p
+        footnote = paste(html_text(html_nodes(page, ".footnote")), collapse = "")
+    )    
+
+}
+
+
+
+scrape_ecb_2007 <- function (i) {
+    # blablabla
+    page <- read_html(paste0(ecb_homepage, ecb_links[i, ]))
+
+    # create data frame for storing the speech texts and metadata
+    ecb_speeches <- tibble(
+        date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
+        title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
+        subtitle = html_text(html_nodes(page, ".ecb-pressContentPubDate")),
+        text     = paste(html_text(html_nodes(page, "article p")), collapse = ""), 
+        footnote = paste(html_text(html_nodes(page, ".footnote p")), collapse = "")
+    )    
+
+}
+
+
+
+
+# get list of links to speeches
+ecb_links <- map_df(2009, get_speech_list_ecb)
+
+#### need to get rid of non-english speeches!
+    # only delete if there is an english version available
+    # extract speech language in new column
+
+ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2007) 
+
+
+
+# ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb) %>%
+#    mutate(date = as.Date(date, format = "%d %B %Y"))
+
+
+#------------to do---------------#
+# extract speaker
+# create id for each speech
+# extract footnotes if available
 
 
 ```
+
+
+
+## Save scraped texts to files
+
+```{r save2file}
+
+
+speeches_to_file <- function(i) {
+    write(ecb_speeches$text[i], file = paste0(ecb_speeches$date[i], " - ECB - Name", ".txt"))
+}
+
+# need to write with walk function as saving file is a side effect
+
+```
+
+
+
+
+
+```{r}
+# scrape_ecb_overview <- function (i) {
+#     
+#     # concatenate the ecb url with the iterator
+#     page <- read_html(sprintf(ecb_url, i)) 
+#     
+#     # create data frame with info about the speeches
+#     speeches_df <- data.frame(
+#         date  = html_text(html_nodes(page, "dt")), 
+#         title = html_text(html_nodes(page, "dd > .doc-title a")), 
+#         info  = html_text(html_nodes(page, ".doc-subtitle")), 
+#         language  = html_text(html_nodes(page, "dd > .ecb-langSelector .offeredLanguage")),
+#         #link  =  html_attr(html_nodes(page, ".doc-subtitle+ .ecb-langSelector a"), "href"), 
+#         # doesnt work to select the links for all identified speeches, pdfs should be included
+#         stringsAsFactors = FALSE
+#     )
+# 
+#     
+#     # return the data frame    
+#     return(speeches_df)
+# }
+# 
+# ecb_info <- map_df(2018, scrape_ecb)
+
+```
+
+
+
+
+### Text cleaning
+
+* get rid of footnote marks
+* what about the line breaks? How can they be kept?
+
+
+
+
+---------------------------------
+
+## FED speeches
+
+
+```{r}
+fed_url <- "https://www.federalreserve.gov/newsevents/speech/%dspeech.htm"
+fedtest <- "https://www.federalreserve.gov/newsevents/speech/2010speech.htm"
+
+
+# works also with javascript
+newfedurl <- "https://www.federalreserve.gov/newsevents/speeches.htm"
+page <- read_html(newfedurl)
+
+
+
+
+## function to retrieve list of the fed speech links and metadata
+get_speech_list_fed <- function (i) {
+    
+    # concatenate the ecb url with the iterator
+    page <- read_html(sprintf(fed_url, i)) 
+        
+    ## only valid for speeches from 1996 -- 2005
+    if (i < 2006) {
+
+        # create vector of all speech links
+        speech_links <- tibble(
+            date      = page %>% html_nodes("#speechIndex li") %>% html_text(),
+            speaker   = page %>% html_nodes(".speaker") %>% html_text(),
+            title     = page %>% html_nodes("#speechIndex a") %>% html_text(),
+            subtitle  = page %>% html_nodes(".location") %>% html_text(),
+            link      = page %>% html_nodes("#speechIndex a") %>% html_attr("href")
+        ) %>% 
+        mutate(date = str_sub(date, start = 1, end = 25)) # get the date right with stringr!!!
+    } else if (i > 2005 & i <= 2010) {
+    # only valid for speeches as of 2006 to 2010
+        ## prossibly one can use the new page until 2018 for all speeches after 2005, so this part 
+        ##needs to be overhauled!
+        
+        # create vector of all speech links
+        speech_links <- tibble(
+            date      = page %>% html_nodes("time") %>% html_text(),
+            speaker   = page %>% html_nodes(".news__speaker") %>% html_text(),
+            title     = page %>% html_nodes("#content a em") %>% html_text(),
+            subtitle  = page %>% html_nodes(".news__speaker+ p") %>% html_text(),
+            link      = page %>% html_nodes("#content a em") %>% html_attr("href") ## der link klappt nicht
+        ) 
+    } else {
+        print("blubsch!")
+    }
+}
+
+# get list of links to speeches
+#ecb_links <- map_df(2017:2018, get_speech_list_ecb)
+
+#### need to get rid of non-english speeches!
+
+
+
+#ecb_homepage <- "https://www.ecb.europa.eu"
+
+
+# function for storing the speech texts in a data frame 
+scrape_ecb <- function (i) {
+    # blablabla
+    page <- read_html(paste0(ecb_homepage, ecb_links[i, ]))
+
+    # create data frame for storing the speech texts and metadata
+    ecb_speeches <- tibble(
+        date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
+        title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
+        subtitle = html_text(html_nodes(page, ".ecb-pressContentSubtitle")),
+        text     = paste(html_text(html_nodes(page, "article p")), collapse = "")
+    )    
+
+}
+
+ecb_speeches <- map_df(1:100, scrape_ecb) 
+
+
+```
+
+
+
+
+---------------------------------------
+
+## BoE speeches
+
+Resources: 
+
+PhantomJS: 
+
+* https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r#comments
+* http://www.rladiesnyc.org/post/scraping-javascript-websites-in-r/
+
+
+
+
+```{r}
+
+boe_url <- "https://www.bankofengland.co.uk/speech/speeches"
+
+page_js <- read_html(boe_url)
+
+emailjs <- read_html(link) %>% html_nodes('li')# %>% html_nodes('script')# %>% html_text()
+
+
+# scrape_boe <- function () {
+#     # blablabla
+#     page <- read_html(boe_url)
+# 
+#     # create data frame for storing the speech texts and metadata
+#     boe_speeches <- tibble(
+#         date     = html_text(html_nodes(page, ".release-date")),
+#         title    = html_text(html_nodes(page, "#SearchResults .exclude-navigation")),
+#         links    = html_attr(html_nodes(page, "#SearchResults .exclude-navigation"), "href")
+#     )    
+# 
+# }
+
+# ecb_speeches <- map_df(1:100, scrape_ecb) 
+
+boe <- scrape_boe()
+
+
+
+# download the actual pdf file to a folder
+speech_url <- "https://www.bankofengland.co.uk/-/media/boe/files/speech/2018/good-cop-bad-cop-speech-by-sam-woods.pdf"
+
+download.file(speech_url, "D:/Test.pdf", mode="wb")
+
+# file should be named with the ID tag like the other speeches
+
+```
+
+
+```{r test_js_scraping}
+
+#Loading both the required libraries
+library(rvest)
+library(V8)
+
+#URL with js-rendered content to be scraped
+link <- 'https://food.list.co.uk/place/22191-brewhemia-edinburgh/'
+
+#Read the html page content and extract all javascript codes that are inside a list
+emailjs <- read_html(link) %>% html_nodes('li') %>% html_nodes('script') %>% html_text()
+
+# Create a new v8 context
+ct <- v8()
+
+#parse the html content from the js output and print it as text
+read_html(ct$eval(gsub('document.write','',emailjs))) %>% 
+ html_text()
+
+```
+
+
+
+```{r Rselenium_scraping}
+
+library(RSelenium)
+library(rvest)
+
+# initialize browser and driver with RSelenium
+ptm <- phantom()
+rd <- remoteDriver(browserName = 'phantomjs')
+rd$open()
+
+# grab source for page
+rd$navigate('https://fantasy.premierleague.com/a/entry/767830/history')
+html <- rd$getPageSource()[[1]]
+
+# clean up
+rd$close()
+ptm$stop()
+
+# parse with rvest
+df <- html %>% read_html() %>% 
+    html_node('#ismr-event-history table.ism-table') %>% 
+    html_table() %>% 
+    setNames(gsub('\\S+\\s+(\\S+)', '\\1', names(.))) %>%    # clean column names
+    setNames(gsub('\\s', '_', names(.)))
+
+str(df)
+
+
+```
+
+
+------------------------------
+
+## Save texts to files 
+
+* text together with Footnotes saved as .txt
+* one file per text
+* naming linke ID
+
+
+```{r}
+print("clean text!")
+
+```
+
 
