@@ -13,8 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Web scraping for cbspeeches
 
-Webinar with Hadley Wickham on webscraping: <https://www.youtube.com/watch?v=tHszX31_r4s>
 
+### Resources: 
+
+* Webinar with Hadley Wickham on webscraping: <https://www.youtube.com/watch?v=tHszX31_r4s>
+* webscraping with R: https://sites.google.com/a/stanford.edu/rcpedia/screen-scraping/web-scraping-with-r
+* rvest tutorial: https://stat4701.github.io/edav/2015/04/02/rvest_tutorial/
 
 
 ### Selector Gadget
