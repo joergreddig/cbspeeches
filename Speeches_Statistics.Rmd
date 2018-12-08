@@ -8,7 +8,7 @@ editor_options:
 ---
 
 
-##Preparing the analysis
+## Preparing the analysis
 
 ```{r Initiate Programme}
 
