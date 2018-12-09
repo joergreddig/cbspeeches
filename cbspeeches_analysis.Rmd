@@ -8,8 +8,10 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-library(tidyverse)
 library(cbspeeches)
+library(tidyverse)
+library(tidytext)
+library(lubridate)
 
 ```
 
@@ -23,3 +25,45 @@ data(cbspeeches)
 
 ```
 
+
+
+```{r}
+
+tidy_speeches <- cbspeeches %>%
+    # Transform the non-tidy text data to tidy text data
+    unnest_tokens(word, text)
+
+
+
+# count_crisis_over_time <- tidy_speeches %>%
+#     select(doc_id, date, institution, word) %>% 
+#     # Define a new column using floor_date() from lubridate
+#     mutate(date = floor_date(date, unit = "3 months")) %>%
+#     # Group by date
+#     group_by(date, institution) %>%
+#     mutate(total_words = n()) %>%
+#     ungroup() %>%
+#     filter(word %in% c("crisis", "crises", "krise", "krisen"))
+
+    
+
+tidy_speeches %>%
+    filter(word %in% c("crisis", "crises", "krise", "krisen")) %>% 
+    # Define a new column that rounds each date to the nearest 1 month
+    mutate(date = floor_date(date, unit = "3 months"))  %>%
+    group_by(date) %>%
+    mutate(total_words = n()) %>%
+    # Count by date and word
+    count(date, institution, total_words) %>%
+    ungroup() %>%
+    mutate(percent = n / total_words) %>%
+    # Set up your plot with aes()
+    ggplot(aes(date, n, colour = institution)) +
+    # Make facets by word
+    facet_wrap(~institution) +
+    geom_line(size = 1.5, show.legend = FALSE) +
+    expand_limits(y = 0)
+
+
+
+```
