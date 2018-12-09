@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ##--------- Loading packages ----------##
 
 library(tidyverse)
+#library(stringr)
 library(rvest)
 library(V8)
 
@@ -22,8 +23,12 @@ library(V8)
 
 ## Web scraping for cbspeeches
 
-Webinar with Hadley Wickham on webscraping: <https://www.youtube.com/watch?v=tHszX31_r4s>
 
+### Resources: 
+
+* Webinar with Hadley Wickham on webscraping: <https://www.youtube.com/watch?v=tHszX31_r4s>
+* webscraping with R: https://sites.google.com/a/stanford.edu/rcpedia/screen-scraping/web-scraping-with-r
+* rvest tutorial: https://stat4701.github.io/edav/2015/04/02/rvest_tutorial/
 
 
 ### Selector Gadget
@@ -42,7 +47,9 @@ https://stackoverflow.com/questions/39246739/downloading-multiple-files-using-do
 
 
 
-## ECB speeces
+------------------------------------------------
+
+## ECB speeches
 
 * YT tutorial: https://www.youtube.com/watch?v=82s8KdZt5v8
 * Datacamp tutorial: https://www.datacamp.com/community/tutorials/r-web-scraping-rvest
@@ -60,11 +67,14 @@ get_speech_list_ecb <- function (i) {
 
     # create vector of all speech links
     speech_links <- tibble(
-        links = html_attr(html_nodes(page, ".doc-subtitle+ .ecb-langSelector a"), "href")
+        #links = html_attr(html_nodes(page, ".doc-subtitle+ .ecb-langSelector a"), "href"),
+        ###links = html_attr(html_nodes(page, "#ecb-content-col .arrow"), "href"),
+        links = html_attr(html_nodes(page, ".offeredLanguage a"), "href"),
+        date  = html_text(html_nodes(page, "dt"))
     )
 }
 
-
+###
 
 ecb_homepage <- "https://www.ecb.europa.eu"
 
@@ -86,14 +96,16 @@ scrape_ecb <- function (i) {
 }
 
 
+# for which range is this function?
 
 scrape_ecb_2007 <- function (i) {
     # blablabla
-    page <- read_html(paste0(ecb_homepage, ecb_links[i, ]))
+    page <- read_html(paste0(ecb_homepage, ecb_links[i, 1]))
 
     # create data frame for storing the speech texts and metadata
     ecb_speeches <- tibble(
-        date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
+        #date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
+        #date     = ecb_links[, 2],
         title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
         subtitle = html_text(html_nodes(page, ".ecb-pressContentPubDate")),
         text     = paste(html_text(html_nodes(page, "article p")), collapse = ""), ###instead of only article p
@@ -105,19 +117,57 @@ scrape_ecb_2007 <- function (i) {
 
 
 
-# get list of links to speeches
-ecb_links <- map_df(2009, get_speech_list_ecb)
+# get list of links to speeches 2006-2011 without 2007, and 2010
+ecb_links <- map_df(2011, get_speech_list_ecb)
 
 #### need to get rid of non-english speeches!
 
 ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2007) 
 
 
+# add date column to speeches vector
+ecb_speeches <- cbind(ecb_links[, 2], ecb_speeches)
 
-# ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb) %>%
-#    mutate(date = as.Date(date, format = "%d %B %Y"))
+# transform it to prober date column
+ecb_speeches <- ecb_speeches %>% 
+    mutate(date = as.Date(date, format = "%d/%m/%Y"))
 
 
+
+
+##--------------------------------------------------------------
+## Add speaker names ##
+
+for (i in 1:nrow(ecb_speeches)) {
+    if(str_detect(ecb_speeches$subtitle[i], "Jean-Claude Trichet")) {
+        ecb_speeches$speaker[i] <- "Jean-Claude Trichet"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Jürgen Stark")) {
+        ecb_speeches$speaker[i] <- "Juergen Stark"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Gertrude Tumpel-Gugerell")) {
+        ecb_speeches$speaker[i] <- "Gertrude Tumpel-Gugerell"
+    } else if (str_detect(ecb_speeches$subtitle[i], "José Manuel González-Páramo")) {
+        ecb_speeches$speaker[i] <- "Jose Manuel Gonzalez-Paramo"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Lucas Papademos")) {
+        ecb_speeches$speaker[i] <- "Lucas Papademos"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Lorenzo Bini Smaghi")) {
+        ecb_speeches$speaker[i] <- "Lorenzo Bini Smaghi"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Otmar Issing")) {
+        ecb_speeches$speaker[i] <- "Otmar Issing"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Mario Draghi")) {
+        ecb_speeches$speaker[i] <- "Mario Draghi"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Vítor Constâncio")) {
+        ecb_speeches$speaker[i] <- "Vitor Constancio"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Peter Praet")) {
+        ecb_speeches$speaker[i] <- "Peter Praet"
+    } else {
+        ecb_speeches$speaker[i] <- "unknown"
+    } 
+}
+
+    
+# unknown <- ecb_speeches %>% filter(speaker == "unknown") %>% select(speaker, subtitle)
+
+    
 #------------to do---------------#
 # extract speaker
 # create id for each speech
@@ -132,9 +182,16 @@ ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2007)
 
 ```{r save2file}
 
-write(ecb_speeches$text[4], file = paste0(ecb_speeches$date[4], " - ECB - Name", ".txt"))
+
+save_speeches_to_file <- function(index){
+    #write each speech to a text document
+    write(ecb_speeches$text[index], file = paste0(ecb_speeches$date[index], " - ECB - ", ecb_speeches$speaker[index], ".txt"))
+}
+ 
 
 # need to write with walk function as saving file is a side effect
+walk(1:nrow(ecb_speeches), save_speeches_to_file)
+
 
 ```
 
