@@ -55,6 +55,8 @@ https://stackoverflow.com/questions/39246739/downloading-multiple-files-using-do
 * Datacamp tutorial: https://www.datacamp.com/community/tutorials/r-web-scraping-rvest
 
 
+### Definition of functions
+
 ```{r}
 ecb_url <- "https://www.ecb.europa.eu/press/key/date/%d/html/index.en.html"
 
@@ -128,8 +130,8 @@ scrape_ecb <- function (i) {
         date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
         title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
         subtitle = html_text(html_nodes(page, ".ecb-pressContentSubtitle")),
-        text     = paste(html_text(html_nodes(page, "#ecb-content-col li , article p")), collapse = ""), ###instead of only article p
-        footnote = paste(html_text(html_nodes(page, ".footnote")), collapse = "")
+        text     = paste(html_text(html_nodes(page, "#ecb-content-col li , article p")), collapse = " "), ###instead of only article p
+        footnote = paste(html_text(html_nodes(page, ".footnote")), collapse = " ")
     )    
 
 }
@@ -147,17 +149,21 @@ scrape_ecb_2006 <- function (i) {
         #date     = ecb_links[, 2],
         title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
         subtitle = html_text(html_nodes(page, ".ecb-pressContentPubDate")),
-        text     = paste(html_text(html_nodes(page, "article p")), collapse = ""), ###instead of only article p
-        footnote = paste(html_text(html_nodes(page, ".footnote p")), collapse = "")
+        text     = paste(html_text(html_nodes(page, "article p")), collapse = " "), ###instead of only article p
+        footnote = paste(html_text(html_nodes(page, ".footnote p")), collapse = " ")
     )    
 
 }
 
+```
 
 
+### Actual scraping for ECB speeches
 
-# get list of links to speeches 2006-2011 without 2007, and 2010
-ecb_links <- map_df(2005, get_speech_list_ecb)
+```{r}
+
+# get list of links to speeches 2000-2011 without 2004, 2007, and 2010
+ecb_links <- map_df(2001:2003, get_speech_list_ecb) # c(2000:2003, 2005, 2006, 2008, 2009, 2011:2019)
 
 # for 2007 get list of links: 
 ecb_links <- map_df(2007, get_speech_list_ecb_2007)
@@ -197,7 +203,7 @@ for (i in 1:nrow(ecb_speeches)) {
         ecb_speeches$speaker[i] <- "Gertrude Tumpel-Gugerell"
     } else if (str_detect(ecb_speeches$subtitle[i], "José Manuel González-Páramo")) {
         ecb_speeches$speaker[i] <- "Jose Manuel Gonzalez-Paramo"
-    } else if (str_detect(ecb_speeches$subtitle[i], "Lucas Papademos")) {
+    } else if (str_detect(ecb_speeches$subtitle[i], "Papademos")) {
         ecb_speeches$speaker[i] <- "Lucas Papademos"
     } else if (str_detect(ecb_speeches$subtitle[i], "Lorenzo Bini Smaghi")) {
         ecb_speeches$speaker[i] <- "Lorenzo Bini Smaghi"
@@ -207,6 +213,18 @@ for (i in 1:nrow(ecb_speeches)) {
         ecb_speeches$speaker[i] <- "Mario Draghi"
     } else if (str_detect(ecb_speeches$subtitle[i], "Vítor Constâncio")) {
         ecb_speeches$speaker[i] <- "Vitor Constancio"
+    } else if (str_detect(ecb_speeches$subtitle[i], "Duisenberg")) {
+        ecb_speeches$speaker[i] <- "Willem Duisenberg" 
+    } else if (str_detect(ecb_speeches$subtitle[i], "Ottmar Issing")) {
+        ecb_speeches$speaker[i] <- "Ottmar Issing" 
+    } else if (str_detect(ecb_speeches$subtitle[i], "Padoa-Schioppa")) {
+        ecb_speeches$speaker[i] <- "Tommaso Padoa-Schioppa" 
+    } else if (str_detect(ecb_speeches$subtitle[i], "Noyer")) {
+        ecb_speeches$speaker[i] <- "Christian Noyer" 
+    } else if (str_detect(ecb_speeches$subtitle[i], "Eugenio Domingo Solans")) {
+        ecb_speeches$speaker[i] <- "Eugenio Domingo Solans" 
+    } else if (str_detect(ecb_speeches$subtitle[i], "Sirkka Hämäläinen")) {
+        ecb_speeches$speaker[i] <- "Sirkka Haemaelaeinen" 
     } else if (str_detect(ecb_speeches$subtitle[i], "Peter Praet")) {
         ecb_speeches$speaker[i] <- "Peter Praet"
     } else {
@@ -215,7 +233,8 @@ for (i in 1:nrow(ecb_speeches)) {
 }
 
     
-
+ 
+ 
 # unknown <- ecb_speeches %>% filter(speaker == "unknown") %>% select(speaker, subtitle)
 
     
@@ -225,6 +244,17 @@ for (i in 1:nrow(ecb_speeches)) {
 # extract footnotes if available
 
 
+```
+
+
+## Create "All Speeches"-type table
+
+```{r}
+ecb_speeches %>% 
+    mutate(institution = "ECB", 
+           doc_id = paste0(date, " - ", institution, " - ", speaker, ".txt")) %>%
+    select(doc_id, date, speaker, subtitle, title, institution) %>% 
+    write_csv2("ecb_speeches_scraped.csv")
 ```
 
 

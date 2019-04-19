@@ -76,9 +76,7 @@ cbspeeches <- cbspeeches %>%
 
 ```{r}
 
-speeches_overview <- read_excel("data/Raw Data - All Speeches 2006-2018.xlsx", sheet = "All speeches 2014-2018")
- 
-speeches_overview <- speeches_overview %>%
+speeches_overview <- read_excel("data/Raw Data - All Speeches 2006-2018.xlsx", sheet = "All speeches 2014-2018") %>%
     select(c(Filename, City, Country, Event, Title, Language)) %>% 
     rename(doc_id = Filename, city = City, country = Country, event = Event, title = Title, language = Language)
 
@@ -100,7 +98,7 @@ rm(speeches_overview)
 Use the `use_data` function to save the data frame into the data folder of the package as an `rda` file:
 
 ```{r}
-devtools::use_data(cbspeeches, overwrite = TRUE)
+usethis::use_data(cbspeeches, overwrite = TRUE)
 
 ```
 
