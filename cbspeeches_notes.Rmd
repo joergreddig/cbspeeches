@@ -77,7 +77,7 @@ cbspeeches <- cbspeeches %>%
 ```{r}
 
 speeches_overview <- read_excel("data/Raw Data - All Speeches 2006-2018.xlsx", sheet = "All speeches 2014-2018") %>%
-    select(c(Filename, City, Country, Event, Title, Language)) %>% 
+    select(Filename, City, Country, Event, Title, Language) %>% 
     rename(doc_id = Filename, city = City, country = Country, event = Event, title = Title, language = Language)
 
 cbspeeches <- inner_join(cbspeeches, speeches_overview)
