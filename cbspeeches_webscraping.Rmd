@@ -204,7 +204,7 @@ scrape_ecb_x <- function (i) {
 ```{r}
 
 # get list of links to speeches 2000-2011 without 2004, 2007, and 2010
-ecb_links <- map_df(2004, get_speech_list_ecb) %>% # c(2000:2003, 2005, 2006, 2008, 2009, 2011:2019)
+ecb_links <- map_df(2005, get_speech_list_ecb) %>% # c(2000:2003, 2005, 2006, 2008, 2009, 2011:2019)
     # At 21.6.2004 a pdf presentation was given, not a speech
         filter(date != "21/06/2004")
 
@@ -220,7 +220,7 @@ ecb_links <- map_df(2019, get_speech_list_ecb_2019) %>%
 
 #### need to get rid of non-english speeches!
 
-ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2004) 
+ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2004) #2004, 2005
 
 
 ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_x) 
