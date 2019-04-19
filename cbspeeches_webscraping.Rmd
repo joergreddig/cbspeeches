@@ -114,6 +114,19 @@ get_speech_list_ecb_2007 <- function (i) {
 }
 
 
+## function to retrieve list of the links to ecb speeches
+get_speech_list_ecb_2019 <- function (i) {
+    
+    # concatenate the ecb url with the iterator
+    page <- read_html(sprintf(ecb_url, i)) 
+
+    # create vector of all speech links
+    speech_links <- tibble(
+        links = html_attr(html_nodes(page, "#ecb-content-col .arrow"), "href"),
+        date  = html_text(html_nodes(page, "dt"))
+    )
+}
+
 
 ###
 
@@ -133,11 +146,10 @@ scrape_ecb <- function (i) {
         text     = paste(html_text(html_nodes(page, "#ecb-content-col li , article p")), collapse = " "), ###instead of only article p
         footnote = paste(html_text(html_nodes(page, ".footnote")), collapse = " ")
     )    
-
 }
 
 
-# for which range is this function?
+# for 2006:
 
 scrape_ecb_2006 <- function (i) {
     # blablabla
@@ -152,7 +164,22 @@ scrape_ecb_2006 <- function (i) {
         text     = paste(html_text(html_nodes(page, "article p")), collapse = " "), ###instead of only article p
         footnote = paste(html_text(html_nodes(page, ".footnote p")), collapse = " ")
     )    
+}
 
+
+# for 2019 --doesnt work so far!!!
+scrape_ecb <- function (i) {
+    # blablabla
+    page <- read_html(paste0(ecb_homepage, ecb_links[i, ]))
+
+    # create data frame for storing the speech texts and metadata
+    ecb_speeches <- tibble(
+        date     = html_text(html_nodes(page, ".ecb-bcCurrent")),
+        title    = html_text(html_nodes(page, ".ecb-pressContentTitle")),
+        subtitle = html_text(html_nodes(page, ".ecb-pressContentSubtitle")),
+        text     = paste(html_text(html_nodes(page, "#ecb-content-col li , article p")), collapse = " "), ###instead of only article p
+        footnote = paste(html_text(html_nodes(page, ".footnote")), collapse = " ")
+    )    
 }
 
 ```
@@ -163,16 +190,19 @@ scrape_ecb_2006 <- function (i) {
 ```{r}
 
 # get list of links to speeches 2000-2011 without 2004, 2007, and 2010
-ecb_links <- map_df(2001:2003, get_speech_list_ecb) # c(2000:2003, 2005, 2006, 2008, 2009, 2011:2019)
+ecb_links <- map_df(2006, get_speech_list_ecb) # c(2000:2003, 2005, 2006, 2008, 2009, 2011:2019)
 
 # for 2007 get list of links: 
 ecb_links <- map_df(2007, get_speech_list_ecb_2007)
 
+ecb_links <- map_df(2019, get_speech_list_ecb_2019)
 
 
 #### need to get rid of non-english speeches!
 
-ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2006) 
+ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb) 
+
+ecb_speeches <- map_df(1:nrow(ecb_links), scrape_ecb_2006) # 2006, 2007
 
 
 # add date column to speeches vector
@@ -252,8 +282,17 @@ for (i in 1:nrow(ecb_speeches)) {
 ```{r}
 ecb_speeches %>% 
     mutate(institution = "ECB", 
-           doc_id = paste0(date, " - ", institution, " - ", speaker, ".txt")) %>%
-    select(doc_id, date, speaker, subtitle, title, institution) %>% 
+           doc_id = paste0(date, " - ", institution, " - ", speaker, ".txt"),
+           city = "",
+           country = "", 
+           length = "", 
+           words_per_sentence = "", 
+           characters_per_word = "", 
+           flesch = "", 
+           flesch_grad = "", 
+           language = "", 
+           source = "") %>%
+    select(doc_id, date, speaker, city, country, subtitle, title, length, words_per_sentence, characters_per_word, flesch, flesch_grade, language, institution, source) %>% 
     write_csv2("ecb_speeches_scraped.csv")
 ```
 

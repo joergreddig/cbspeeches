@@ -22,7 +22,17 @@ library(lubridate)
 # load data from package
 data(cbspeeches)
 
+```
 
+
+
+```{r}
+cbspeeches %>%
+    select(institution, date) %>%
+    mutate(date = year(date)) %>% 
+    filter(institution == "ECB") %>% 
+    distinct(date) %>% 
+    arrange(date)
 ```
 
 
