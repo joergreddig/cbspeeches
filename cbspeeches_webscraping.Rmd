@@ -346,7 +346,7 @@ temp <- ecb_speeches %>%
            language = textcat::textcat(text),
            link = paste0("<a href='", ecb_homepage, links, "'>Link</a>"),
            source = "") %>%
-    select(doc_id, date, speaker, city, country, subtitle, title, length, words_per_sentence, characters_per_word, flesch, flesch_grade, language, institution, link, source) # %>% 
+    select(doc_id, date, speaker, text, city, country, subtitle, title, length, words_per_sentence, characters_per_word, flesch, flesch_grade, language, institution, link, source) # %>% 
     # write_csv2("ecb_speeches_scraped.csv")
 
 
